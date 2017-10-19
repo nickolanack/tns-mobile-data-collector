@@ -1,0 +1,25 @@
+{
+  "name": "tns-mobile-data-collector",
+  "version": "1.0.0",
+  "description": "mobile app library for spatial datacollection apps that connect to a geolive server ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickolanack/tns-mobile-data-collector.git"
+  },
+  "keywords": [
+    "geolive",
+    "mobile",
+    "spatial",
+    "datalogger"
+  ],
+  "author": "Nick Blackwell",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nickolanack/tns-mobile-data-collector/issues"
+  },
+  "homepage": "https://github.com/nickolanack/tns-mobile-data-collector#readme"
+}
