@@ -5,14 +5,23 @@ var dialogs = require("ui/dialogs");
 var platform = require("tns-core-modules/platform");
 console.log(JSON.stringify(platform));
 
-function Account() {};
+
+var client;
+var configuration;
+var configurationName;
+
+function Account() {
+
+
+	client = global.client;
+	configuration = global.configuration;
+	configurationName=global.parameters.configuration;
+
+};
 
 
 
-var client = global.client;
-var configuration = global.configuration;
 
-var configurationName=global.parameters.configuration;
 
 var loadApplication = function() {
 

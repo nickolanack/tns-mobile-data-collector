@@ -5,10 +5,12 @@ var ImageSource = require("image-source");
 var fs = require("file-system");
 
 
-var configurationName=global.parameters.configuration;
+var configurationName;
 
 
 function Configuration(client) {
+
+	configurationName=global.parameters.configuration;
 	var me = this;
 	me.client = client;
 	me._refreshCacheItems=true; //use cached items if available
