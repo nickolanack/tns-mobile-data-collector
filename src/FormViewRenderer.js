@@ -27,14 +27,10 @@ var progressModule = require("ui/progress");
 var utilityModule = require("utils/utils");
 
 
-var resolveString=function(str){
+var decodeVariable=function(str, template){
 
-
-	if(str[0]==='{'&&str[str.length-1]==='}'){
-		//console.log(str.substring(1, str.length-1));
-		return global.configuration.get(str.substring(1, str.length-1), str);
-	}
-	return str;
+	console.log('Decoding Variable '+str);
+	return global.configuration.decodeVariable(str, template);
 }
 
 
@@ -44,7 +40,7 @@ var renderHeading = function(container, field) {
 
 
 	var label = new labelModule.Label();
-	label.text = resolveString(field.value);
+	label.text = decodeVariable(field.value);
 	label.className = "heading";
 	label.textWrap=true;
 	container.addChild(label);
@@ -56,7 +52,7 @@ var renderLabel = function(container, field) {
 
 
 	var label = new labelModule.Label();
-	label.text = resolveString(field.value);
+	label.text = decodeVariable(field.value);
 	label.className = "label";
 	label.textWrap=true;
 	container.addChild(label);
@@ -68,7 +64,7 @@ var renderHtml = function(container, field) {
 
 
 	var htmlView = new htmlViewModule.HtmlView();
-	htmlView.html = resolveString(field.value);
+	htmlView.html = decodeVariable(field.value);
 	container.addChild(htmlView);
 
 }
@@ -332,13 +328,13 @@ var renderIconselect = function(container, field, model) {
 	wrapLayout.className = "iconselect";
 	container.addChild(wrapLayout);
 
-	field.icons.forEach(function(icon) {
+	decodeVariable(field.icons, field.template).forEach(function(icon) {
 
 		var imageStack = new stackLayoutModule.StackLayout();
 		wrapLayout.addChild(imageStack);
 
 		var stackLayout = new stackLayoutModule.StackLayout();
-		var className = "icon value-" + (icon.icon);
+		var className = "icon value-" + (icon.value.toLowerCase());
 		stackLayout.className = className;
 		imageStack.addChild(stackLayout);
 
@@ -936,12 +932,11 @@ ViewRenderer.prototype.renderView = function(context, container, model, page) {
 
 
 
-
 	var forms=global.parameters.forms;
     container.className = "form-"+formName;
 
     if(typeof forms=='string'&&forms[0]=="{"){
-    	forms=resolveString(forms);
+    	forms=decodeVariable(forms);
     }
 
     var elements=forms[formName];

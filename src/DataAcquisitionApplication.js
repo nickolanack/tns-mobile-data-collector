@@ -18,21 +18,8 @@ function DataAcquisitionApplication(client, params){
 }
 var replaceVars=function(str, data, prefix){
 
-    if(!prefix){
-        prefix='';
-    }
 
-    Object.keys(data).forEach(function(key){
-
-        console.log('check '+'{'+prefix+key+'}')
-        str=str.replace('{'+prefix+key+'}', data[key]);
-
-        if(Object.prototype.toString.call(data[key]) == "[object Object]"){
-            str=replaceVars(str, data[key], prefix+key+'.');
-        }
-    })
-
-    return str;
+    return global.configuration.replaceVars(str, data, prefix)
 
 };
 

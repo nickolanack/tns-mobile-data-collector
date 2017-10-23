@@ -8,100 +8,103 @@ var fs = require("file-system");
 var configurationName;
 
 
+
 function Configuration(client) {
 
-	configurationName=global.parameters.configuration;
+	configurationName = global.parameters.configuration;
 	var me = this;
 	me.client = client;
-	me._refreshCacheItems=true; //use cached items if available
-	me._defaultConfig=false;
-	me._configs={};
+	me._refreshCacheItems = true; //use cached items if available
+	me._defaultConfig = false;
+	me._configs = {};
 
 };
 
-var saveImage=function(name, imgSource){
+var saveImage = function(name, imgSource) {
 
-	
+
 	var path = imagePath(name);
 	var saved = imgSource.saveToFile(path, "png");
-	if(!saved){
-		throw 'Failed to save image: '+name+' at path: '+path;
+	if (!saved) {
+		throw 'Failed to save image: ' + name + ' at path: ' + path;
 	}
 	return path;
 }
 
 
 
-var imagePath=function(name){
+var imagePath = function(name) {
+
+	name=name.split('/').join('.');
 
 	var folder = fs.knownFolders.temp();
-	var path = fs.path.join(folder.path, name+".png");
-	
+	var path = fs.path.join(folder.path, name + ".png");
+
 	return path;
 }
 
-var hasImage=function(name){
+var hasImage = function(name) {
 	return fs.File.exists(imagePath(name));
 }
 
 
-var saveStyle=function(name, styleString){
+var saveStyle = function(name, styleString) {
 	var path = stylePath(name);
 	var file = fs.File.fromPath(path);
-	
+
 	return file.writeText(styleString);
 
 }
 
 
 
-var stylePath=function(name){
+var stylePath = function(name) {
 
 	var folder = fs.knownFolders.temp();
-	var path = fs.path.join(folder.path, name+".css");
-	
+	var path = fs.path.join(folder.path, name + ".css");
+
 	return path;
 }
 
-var hasStyle=function(name){
+var hasStyle = function(name) {
 	return fs.File.exists(stylePath(name));
 }
 
-var readStyle=function(name){
+var readStyle = function(name) {
 
-	
+
 	var path = stylePath(name);
 	var file = fs.File.fromPath(path);
 	return file.readText();
 }
 
-var configPath=function(name){
+var configPath = function(name) {
 
 	var folder = fs.knownFolders.temp();
-	var path = fs.path.join(folder.path, global.parameters.domain+'.'+name+".json");
-	
+	var path = fs.path.join(folder.path, global.parameters.domain + '.' + name + ".json");
+
 	return path;
 }
 
-var hasConfig=function(name){
+var hasConfig = function(name) {
 	return fs.File.exists(configPath(name));
 }
 
-var saveConfig=function(name, json){
+var saveConfig = function(name, json) {
 
-	
+
 	var path = configPath(name);
 	var file = fs.File.fromPath(path);
-	console.log('Saved Config: '+name+": "+path+" => "+JSON.stringify(json).substring(0,50)+'...');
+	console.log('Saved Config: ' + name + ": " + path + " => " + JSON.stringify(json, null, '  '));// .substring(0, 50) + '...');
 	return file.writeText(JSON.stringify(json));
-    
-}
-var readPath=function(name){
 
-	
+}
+var readPath = function(name) {
+
+
 	var path = configPath(name);
 	var file = fs.File.fromPath(path);
-	console.log('Read Config: '+name+": "+path+" => "+file.lastModified);
+	console.log('Read Config: ' + name + ": " + path + " => " + file.lastModified);
 	return file.readText();
 }
 
@@ -112,21 +115,23 @@ Configuration.prototype.hasConfigurationResources = function(name) {
 	return true;
 }
 
-Configuration.prototype.refreshCacheItems = function(){
-	var me=this;
-	me._refreshCacheItems=true;
+Configuration.prototype.refreshCacheItems = function() {
+	var me = this;
+	me._refreshCacheItems = true;
 }
 
 
-Configuration.prototype.prepareDefaultConfig=function(obj){
+Configuration.prototype.prepareDefaultConfig = function(obj) {
 
-	
-	var config={parameters:{}};
-	Object.keys(global.parameters).forEach(function(k){
-		config.parameters[k]=global.parameters[k];
+
+	var config = {
+		parameters: {}
+	};
+	Object.keys(global.parameters).forEach(function(k) {
+		config.parameters[k] = global.parameters[k];
 	});
-	Object.keys(obj.parameters).forEach(function(k){
-		config.parameters[k]=obj.parameters[k];
+	Object.keys(obj.parameters).forEach(function(k) {
+		config.parameters[k] = obj.parameters[k];
 	});
 
 	return config;
@@ -135,70 +140,74 @@ Configuration.prototype.prepareDefaultConfig=function(obj){
 Configuration.prototype.getConfiguration = function(name) {
 
 	//TODO deprecated. this is a fix for a small server bug where ',' gets appended to names
-	name=name.replace(',','');
-	
-	var me=this;
+	name = name.replace(',', '');
 
-	return new Promise(function(resolve, reject){
+	var me = this;
 
-		if(me._configs[name]){
+	return new Promise(function(resolve, reject) {
+
+		if (me._configs[name]) {
 			resolve(me._configs[name]);
 			return;
 		}
 
 
 
-		var resolveLocalConfig=function(){
+		var resolveLocalConfig = function() {
 
-			console.log('Read Configuration: '+ name);
+			console.log('Read Configuration: ' + name);
 
-			readPath(name).then(function(string){
-				console.log('Successfully read config: '+name);
-				var config=JSON.parse(string);
-				if(!me._defaultConfig){
-					config=me.prepareDefaultConfig(config);
-					me._defaultConfig=config;
+			readPath(name).then(function(string) {
+				console.log('Successfully read config: ' + name);
+				var config = JSON.parse(string);
+				if (!me._defaultConfig) {
+					config = me.prepareDefaultConfig(config);
+					me._defaultConfig = config;
+				}else{
+					me._defaultConfig.parameters[name]=config.parameters;
 				}
-				me._configs[name]=config;
+				me._configs[name] = config;
 
 				me.getIncludes(config);
-				
+
 				resolve(config);
 
-			}).catch(function(e){
-				console.log('Failed to read config: '+name+': '+e);
+			}).catch(function(e) {
+				console.log('Failed to read config: ' + name + ': ' + e);
 				reject(e);
 			});
 		}
 
-		if(hasConfig(name)&&(!me._refreshCacheItems)){
+		if (hasConfig(name) && (!me._refreshCacheItems)) {
 
 			resolveLocalConfig();
 			return;
 		}
 
-		console.log('Downloading Configuration: '+ name);
-		me.client.getConfiguration(name).then(function(config){
+		console.log('Downloading Configuration: ' + name);
+		me.client.getConfiguration(name).then(function(config) {
 
-			if(!me._defaultConfig){
-				config=me.prepareDefaultConfig(config);
-				me._defaultConfig=config;
+			if (!me._defaultConfig) {
+				config = me.prepareDefaultConfig(config);
+				me._defaultConfig = config;
+			}else{
+				me._defaultConfig.parameters[name]=config.parameters;
 			}
-			me._configs[name]=config;
+			me._configs[name] = config;
 
 			me.getIncludes(config);
 
-			saveConfig(name, config).then(function(){
+			saveConfig(name, config).then(function() {
 
-			}).catch(function(e){
-				console.log('Failed to save config: '+name+': '+e);
+			}).catch(function(e) {
+				console.log('Failed to save config: ' + name + ': ' + e);
 			});
 
 			resolve(config);
 
-		}).catch(function(e){
+		}).catch(function(e) {
 
-			if(hasConfig(name)){
+			if (hasConfig(name)) {
 
 				resolveLocalConfig();
 				return;
@@ -214,10 +223,10 @@ Configuration.prototype.getConfiguration = function(name) {
 }
 
 Configuration.prototype.getIncludes = function(config) {
-	var me=this;
-	if(config.parameters.includes){
-		config.parameters.includes.forEach(function(name){
-			if(name&&name!==""){
+	var me = this;
+	if (config.parameters.includes) {
+		config.parameters.includes.forEach(function(name) {
+			if (name && name !== "") {
 				me.getConfiguration(name);
 			}
 		});
@@ -225,7 +234,7 @@ Configuration.prototype.getIncludes = function(config) {
 }
 
 Configuration.prototype.getLocalDataModifiedDate = function(name) {
-	if(hasConfig(name)){
+	if (hasConfig(name)) {
 		var path = configPath(name);
 		var file = fs.File.fromPath(path);
 		return file.lastModified;
@@ -234,24 +243,24 @@ Configuration.prototype.getLocalDataModifiedDate = function(name) {
 }
 
 Configuration.prototype.getLocalData = function(name, defaultValue) {
-	
-	var me=this;
 
-	return new Promise(function(resolve, reject){
+	var me = this;
 
-		if(hasConfig(name)){
-			readPath(name).then(function(string){
-				console.log('Successfully read data: '+name+" "+configPath(name)+":  "+string);
-				var config=JSON.parse(string);
+	return new Promise(function(resolve, reject) {
+
+		if (hasConfig(name)) {
+			readPath(name).then(function(string) {
+				console.log('Successfully read data: ' + name + " " + configPath(name) + ":  " + string);
+				var config = JSON.parse(string);
 				resolve(config);
-			}).catch(function(e){
-				console.log('Failed to read data: '+name+': '+e);
+			}).catch(function(e) {
+				console.log('Failed to read data: ' + name + ': ' + e);
 				reject(e);
 			});
 			return;
 		}
-		console.log('Does not have: '+configPath(name));
-		console.log('Use default data: '+name);
+		console.log('Does not have: ' + configPath(name));
+		console.log('Use default data: ' + name);
 		resolve(defaultValue);
 
 	});
@@ -259,99 +268,128 @@ Configuration.prototype.getLocalData = function(name, defaultValue) {
 }
 
 
-Configuration.prototype.setLocalData= function(name, data) {
+Configuration.prototype.setLocalData = function(name, data) {
 
-	console.log('Store Local Data: '+name+":  "+JSON.stringify(data)+" "+configPath(name));
+	console.log('Store Local Data: ' + name + ":  " + JSON.stringify(data) + " " + configPath(name));
 	return saveConfig(name, data);
 
 }
 
-Configuration.prototype.get = function(name, defaultValue) {
-	var me=this;
 
-	if(!me._defaultConfig){
+/**
+ * recurisively move through an object from a path string. ie: _get("name.value",{name:{value:"some value"}}) returns "some value"
+ */
+Configuration.prototype._get = function(path, config) {
+	var me = this;
+	var parts=path.split('.');
+	var name=parts[0];
+
+
+	if (typeof config[name] != 'undefined') {
+		var value= config[name];
+		if(parts.length>1){
+			return me._get(parts.slice(1).join('.'), value);
+		}
+		return value;
+	}
+
+
+	//console.log("_get_ config: " + path + " does not exist in: "+JSON.stringify(config, null, '  '));
+
+	return null;
+
+
+
+}
+
+
+
+Configuration.prototype.get = function(name, defaultValue) {
+	var me = this;
+
+	if (!me._defaultConfig) {
 		throw 'Configuration not set';
 	}
 
-	
 
-	if(typeof me._defaultConfig.parameters[name] !='undefined'){
-		return me._defaultConfig.parameters[name];
-		
+	var value=me._get(name, me._defaultConfig.parameters);
+	if (value!==null) {
+		return value;
+
 	}
 
-	if(typeof defaultValue !='undefined'){
+	if (typeof defaultValue != 'undefined') {
 
-		console.log("get config: "+name+" does not exist: using default");
+		console.log("get config: " + name + " does not exist: using default: "+JSON.stringify(defaultValue, null, '  '));
 		return defaultValue;
 
 	}
 
-	throw('Undefined config parameter: '+name);
+	throw ('Undefined config parameter: ' + name);
 
-			
+
 
 }
 Configuration.prototype.getIcon = function(name, urlPath) {
 
-	var me=this;
+	var me = this;
 
-	
-	var getLocalIconPromise=function(){
-		var path=imagePath(name);
-		console.log('File exists: '+path);
-		return new Promise(function(resolve, reject){
+
+	var getLocalIconPromise = function() {
+		var path = imagePath(name);
+		console.log('File exists: ' + path);
+		return new Promise(function(resolve, reject) {
 			resolve(path);
 		});
 	}
-	
 
-	if(hasImage(name)&&(!me._refreshCacheItems)){
+
+	if (hasImage(name) && (!me._refreshCacheItems)) {
 		return getLocalIconPromise();
 	}
 
 
 
-	return new Promise(function(resolve, reject){
+	return new Promise(function(resolve, reject) {
 
-		if(!urlPath){
-		
-			urlPath=me.get(name);
-		
+		if (!urlPath) {
+
+			urlPath = me.get(name, name);
+
 		}
 
 
 		//console.log('Requesting cacheable image: '+name+' '+urlPath);
 
-		if(!urlPath){
+		if (!urlPath) {
 			throw "Empty url";
 		}
-		
-		
-		var url="https://"+me.client.getUrl()+'/'+urlPath+"?thumb=128x128";
+
+
+		var url = "https://" + me.client.getUrl() + '/' + urlPath + "?thumb=128x128";
 		// Try to read the image from the cache
 
-		console.log('Requesting icon: '+url);
-		ImageSource.fromUrl(url).then(function (imgSource) {
-		   
-		    	//console.log('Retrieved image: '+JSON.stringify(imgSource));
- 				resolve(saveImage(name, imgSource));
+		console.log('Requesting icon: ' + url);
+		ImageSource.fromUrl(url).then(function(imgSource) {
+
+			//console.log('Retrieved image: '+JSON.stringify(imgSource));
+			resolve(saveImage(name, imgSource));
 
 
 
-		}).catch(function (error) {
+		}).catch(function(error) {
 
-			if(hasImage(name)){
-				getLocalIconPromise().then(function(thing){
+			if (hasImage(name)) {
+				getLocalIconPromise().then(function(thing) {
 					resolve(thing);
-				}).catch(function(e){
+				}).catch(function(e) {
 					reject(e);
 				})
 				return;
 			}
 
-		        reject(error);
-		    });
+			reject(error);
+		});
 
 	});
 
@@ -359,67 +397,66 @@ Configuration.prototype.getIcon = function(name, urlPath) {
 
 
 
-
 Configuration.prototype.getImage = function(name, urlPath) {
 
-	var me=this;
+	var me = this;
 
-	
-	var getLocalImagePromise=function(){
-		var path=imagePath(name);
-		console.log('File exists: '+path);
-		return new Promise(function(resolve, reject){
+
+	var getLocalImagePromise = function() {
+		var path = imagePath(name);
+		console.log('File exists: ' + path);
+		return new Promise(function(resolve, reject) {
 			resolve(path);
 		});
 	}
 
-	if(hasImage(name)&&(!me._refreshCacheItems)){
+	if (hasImage(name) && (!me._refreshCacheItems)) {
 		return getLocalImagePromise();
 	}
 
 
 
-	return new Promise(function(resolve, reject){
+	return new Promise(function(resolve, reject) {
 
-		if(!urlPath){
-		
-			urlPath=me.get(name);
-		
+		if (!urlPath) {
+
+			urlPath = me.get(name);
+
 		}
 
 
 		//console.log('Requesting cacheable image: '+name+' '+urlPath);
 
-		if(!urlPath){
+		if (!urlPath) {
 			throw "Empty url";
 		}
-		
-		
-		var url="https://"+me.client.getUrl()+'/'+urlPath;
+
+
+		var url = "https://" + me.client.getUrl() + '/' + urlPath;
 		// Try to read the image from the cache
 
-		console.log('Requesting image url: '+url);
-		ImageSource.fromUrl(url).then(function (imgSource) {
-		   
-		    	//console.log('Retrieved image: '+JSON.stringify(imgSource));
- 				resolve(saveImage(name, imgSource));
+		console.log('Requesting image url: ' + url);
+		ImageSource.fromUrl(url).then(function(imgSource) {
+
+			//console.log('Retrieved image: '+JSON.stringify(imgSource));
+			resolve(saveImage(name, imgSource));
 
 
 
-		}).catch(function (error) {
+		}).catch(function(error) {
 
-				console.log(error);
+			console.log(error);
 
-				if(hasImage(name)){
-					console.log('Failed to load image: '+name+' but found local copy');
-					getLocalImagePromise().then(function(thing){
-						resolve(thing);
-					}).catch(reject)
-					return;
-				}
+			if (hasImage(name)) {
+				console.log('Failed to load image: ' + name + ' but found local copy');
+				getLocalImagePromise().then(function(thing) {
+					resolve(thing);
+				}).catch(reject)
+				return;
+			}
 
-			    reject(error);
-		    });
+			reject(error);
+		});
 
 	});
 
@@ -428,66 +465,212 @@ Configuration.prototype.getImage = function(name, urlPath) {
 
 Configuration.prototype.getStyle = function(name, urlPath) {
 
-	var me=this;
+	var me = this;
 
-	
-	var getLocalStylePromise=function(){
-		var path=stylePath(name);
-		return new Promise(function(resolve, reject){
+
+	var getLocalStylePromise = function() {
+		var path = stylePath(name);
+		return new Promise(function(resolve, reject) {
 			return readPath(path);
 		});
 	}
 
-	if(hasStyle(name)&&(!me._refreshCacheItems)){
+	if (hasStyle(name) && (!me._refreshCacheItems)) {
 		return getLocalStylePromise();
 	}
 
 
 
-	return new Promise(function(resolve, reject){
+	return new Promise(function(resolve, reject) {
 
-		if(!urlPath){
-		
-			urlPath=me.get(name);
-		
+		if (!urlPath) {
+
+			urlPath = me.get(name);
+
 		}
 
 
 
-		if(!urlPath){
+		if (!urlPath) {
 			throw "Empty url";
 		}
-		
-		
-		var url="https://"+me.client.getUrl()+'/'+urlPath;
+
+
+		var url = "https://" + me.client.getUrl() + '/' + urlPath;
 		// Try to read the stylesheet from the cache
-		console.log("stylesheet: "+url);
+		console.log("stylesheet: " + url);
 		fetch(url)
-		.then(function(response ){ 
-			return response.text();
-		})
-		.then(function(text ){ 
-			console.log(text);
-			saveStyle(name, text);
-			resolve(stylePath(name)); 
-		})
-		.catch(function(err){
+			.then(function(response) {
+				return response.text();
+			})
+			.then(function(text) {
+				console.log(text);
+				saveStyle(name, text);
+				resolve(stylePath(name));
+			})
+			.catch(function(err) {
 
-			if(hasStyle(name)){
-				getLocalStylePromise().then(function(thing){
-					resolve(thing);
-				}).catch(function(e){
-					reject(e);
-				})
-				return;
-			}
+				if (hasStyle(name)) {
+					getLocalStylePromise().then(function(thing) {
+						resolve(thing);
+					}).catch(function(e) {
+						reject(e);
+					})
+					return;
+				}
 
-			reject(err)
-		});
+				reject(err)
+			});
 
 	});
 
 };
+
+
+
+Configuration.prototype.decodeVariable=function(arg, template){
+
+	var me=this;
+
+	console.log('Decode '+arg+(template?' With template':' No Template'));
+
+	if(typeof arg=='string'){
+		var str=arg;
+		if(str[0]==='{'&&str[str.length-1]==='}'){
+			//console.log(str.substring(1, str.length-1));
+			var value= global.configuration.get(str.substring(1, str.length-1), str);
+			if(value===null){
+				console.log('Invalid decode variable: '+arg);
+				throw 'Invalid decode variable: '+arg;
+			}
+
+			if(template){
+				console.log('Use template: '+template);
+
+				var params=JSON.parse(JSON.stringify(me._defaultConfig.parameters));
+
+				if(Object.prototype.toString.call(value) == "[object Array]"){
+
+					return value.map(function(v, i){
+						params.value=v;
+						params.index=i;
+						var result= me.replaceVars(template, params);
+						console.log('Replaced Array Items '+JSON.stringify(template)+' => '+JSON.stringify(result));
+						return result;
+					});
+					
+				}else{
+					params.value=value;
+					return me.replaceVars(template, params);
+				}
+
+				
+			}
+
+			console.log(' => '+JSON.stringify(value));
+
+			return value;
+		}
+	}
+	return arg;
+}
+
+
+Configuration.prototype._format=function(data, formatters){
+
+
+
+	formatters.forEach(function(format){
+		if(format==="lower"){
+			data=data.toLowerCase();
+		}
+	});
+
+	return data;
+
+}
+
+
+Configuration.prototype.replaceVars=function(template, data, prefix){
+
+	var me=this;
+
+    if(!prefix){
+        prefix='';
+    }
+
+    console.log('Replace Vars'+template);
+
+    if(typeof template=="string"){
+    	var str=template;
+
+    	var loops=0;
+
+    	while(str.indexOf('{')>=0){
+
+		    Object.keys(data).forEach(function(key){
+
+		        //console.log('  -- check '+'{'+prefix+key+'}')
+		        str=str.replace('{'+prefix+key+'}', data[key]);
+		        //str=str.replace('{'+prefix+key+'|', '{'+data[key]+'|'); //leave wrap. 
+
+		        var i=-1;
+		        var e=-1;
+		        var d=0;
+		        var f=-1;
+		        while((i=str.indexOf('{'+prefix+key+'|'))>0){
+		        	e=str.indexOf('}');
+		        	var f=str.indexOf('|', i);
+		        	str=str.substring(0,i)+me._format(data[key], str.substring(f+1, e).split('|'))+str.substring(e+1);
+		        	d++;
+		        	if(d>100){
+		        		throw 'At Max Inner Depth (100)!!!';
+		        	}
+		        }
+
+		        if(Object.prototype.toString.call(data[key]) == "[object Object]"){
+		            str=me.replaceVars(str, data[key], prefix+key+'.');
+		        }
+		    })
+
+		    loops++;
+		    if(prefix!==''){
+		    	break;
+		    }
+		    if(loops>10){
+		       	throw 'At Max Main Loop Depth (10)!!! '+str+'  '+JSON.stringify(data, null, '  ');
+		    }
+		}
+
+
+
+
+    return str;
+
+
+    }
+
+    if(Object.prototype.toString.call(template) == "[object Object]"){
+    	var obj=JSON.parse(JSON.stringify(template));
+        Object.keys(obj).forEach(function(k){
+        	obj[k]=me.replaceVars(obj[k], data, prefix);
+        });
+        return obj;
+    }
+
+    if(Object.prototype.toString.call(template) == "[object Array]"){
+       	var arr=JSON.parse(JSON.stringify(template));
+        return arr.map(function(v){
+        	return me.replaceVars(v, data, prefix);
+        });
+
+    }
+
+    throw 'Unexpected template!: '+template;
+    
+
+};
+
 
 
 module.exports = Configuration;
