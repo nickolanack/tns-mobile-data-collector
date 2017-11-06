@@ -1,14 +1,22 @@
 "use strict";
 
+var fs;
+var imageSource;
+var frameModule;
+var dialogs;
 
-var fs = require("file-system");
-var imageSource = require("image-source");
-var frameModule = require("ui/frame");
-var dialogs = require("ui/dialogs");
 
 var options;
+var template;
 
 function DataAcquisitionApplication(client, params){
+
+
+    fs = require("file-system");
+    imageSource = require("image-source");
+    frameModule = require("ui/frame");
+    dialogs = require("ui/dialogs");
+    template=require('../').Template;
 
 	var me=this;
 	me.client=client;
@@ -17,10 +25,7 @@ function DataAcquisitionApplication(client, params){
 
 }
 var replaceVars=function(str, data, prefix){
-
-
-    return global.configuration.replaceVars(str, data, prefix)
-
+    return template.render(str, data, prefix);
 };
 
 
@@ -170,7 +175,9 @@ var processFormFilePath = function(filepath, countItems, callback) {
         var data = JSON.parse(content);
 
         console.log('Read: ' + content)
-        if (data.media) {
+        if (!data.media) {
+            data.media=[];
+        }
             var mediaItems = mediaItemsThatNeedUploading(data.media);
             if (mediaItems.length) {
                 if(!countItems){
@@ -190,13 +197,13 @@ var processFormFilePath = function(filepath, countItems, callback) {
                 })
                 return;
             }
-        }
+        
 
 
 
         console.log('About to save marker');
         console.log(JSON.stringify(data));
-        data.description += data.media.map(function(media) {
+        data.description = (data.description?data.description:"")+data.media.map(function(media) {
             return mediaData(media).html;
         }).join("");
         createMarker(data, function(err){

@@ -1,17 +1,19 @@
-var exit = require('nativescript-exit').exit;
+var exit;
+var dialogs;
+var platform;
 
-var dialogs = require("ui/dialogs");
-
-var platform = require("tns-core-modules/platform");
-console.log(JSON.stringify(platform));
 
 
 var client;
 var configuration;
 var configurationName;
 
-function Account() {
+function Account(configuration) {
 
+
+	exit = require('nativescript-exit').exit;
+	dialogs = require("ui/dialogs");
+	platform = require("tns-core-modules/platform");
 
 	client = global.client;
 	configuration = global.configuration;

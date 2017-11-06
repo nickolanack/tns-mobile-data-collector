@@ -1,35 +1,66 @@
 "use strict";
 
 
+var labelModule;
+var textFieldModule;
+var listPickerModule;
+var switchModule;
+var geolocation;
+var camera;
+var video;
+var stackLayoutModule;
+var wrapLayoutModule;
+var dockLayoutModule;
+var imageModule;
+var ImageSource;
 
-var labelModule = require("ui/label");
-var textFieldModule = require("ui/text-field");
-var listPickerModule = require("ui/list-picker");
-var switchModule = require("ui/switch");
-var geolocation = require("nativescript-geolocation");
-var camera = require("nativescript-camera");
-var video = require("nativescript-videorecorder");
-var stackLayoutModule = require("ui/layouts/stack-layout");
-var wrapLayoutModule = require("ui/layouts/wrap-layout");
-var dockLayoutModule = require("ui/layouts/dock-layout");
-var imageModule = require("ui/image");
-var ImageSource = require("image-source");
-
-var scrollViewModule = require("ui/scroll-view");
-
-
-var htmlViewModule = require("ui/html-view");
-
-var buttonModule = require("ui/button");
-var frameModule = require("ui/frame");
-var progressModule = require("ui/progress");
-
-var utilityModule = require("utils/utils");
+var scrollViewModule;
 
 
-var decodeVariable=function(str, template){
+var htmlViewModule;
 
-	console.log('Decoding Variable '+str);
+var buttonModule;
+var frameModule;
+var progressModule;
+
+var utilityModule;
+
+
+
+function ViewRenderer() {
+	labelModule = require("ui/label");
+	textFieldModule = require("ui/text-field");
+	listPickerModule = require("ui/list-picker");
+	switchModule = require("ui/switch");
+	geolocation = require("nativescript-geolocation");
+	camera = require("nativescript-camera");
+	video = require("nativescript-videorecorder");
+	stackLayoutModule = require("ui/layouts/stack-layout");
+	wrapLayoutModule = require("ui/layouts/wrap-layout");
+	dockLayoutModule = require("ui/layouts/dock-layout");
+	imageModule = require("ui/image");
+	ImageSource = require("image-source");
+	scrollViewModule = require("ui/scroll-view");
+	htmlViewModule = require("ui/html-view");
+	buttonModule = require("ui/button");
+	frameModule = require("ui/frame");
+	progressModule = require("ui/progress");
+	utilityModule = require("utils/utils");
+};
+
+try{
+	
+	var observableModule = require("data/observable");
+	ViewRenderer.prototype = new observableModule.Observable();
+
+}catch(e){
+	console.error('Unable to extend Observable!!!')
+}
+
+
+var decodeVariable = function(str, template) {
+
+	console.log('Decoding Variable ' + str);
 	return global.configuration.decodeVariable(str, template);
 }
 
@@ -42,7 +73,7 @@ var renderHeading = function(container, field) {
 	var label = new labelModule.Label();
 	label.text = decodeVariable(field.value);
 	label.className = "heading";
-	label.textWrap=true;
+	label.textWrap = true;
 	container.addChild(label);
 
 }
@@ -54,7 +85,7 @@ var renderLabel = function(container, field) {
 	var label = new labelModule.Label();
 	label.text = decodeVariable(field.value);
 	label.className = "label";
-	label.textWrap=true;
+	label.textWrap = true;
 	container.addChild(label);
 
 }
@@ -80,16 +111,21 @@ var renderLocation = function(container, field, model) {
 		model.set('coordinates', [0, 0]);
 
 		var location = geolocation.watchLocation(
-		function(loc) {
-			if (loc) {
-				console.log("Current location is: " + JSON.stringify(loc));
-				model.set('coordinates', [loc.latitude, loc.longitude]);
-			}
+			function(loc) {
+				if (loc) {
+					console.log("Current location is: " + JSON.stringify(loc));
+					model.set('coordinates', [loc.latitude, loc.longitude]);
+				}
 
-		}, function(e) {
-			console.log("Error: " + e.message);
-			//getLocation();
-		}, {desiredAccuracy: 3, updateDistance: 10, minimumUpdateTime : 1000 * 10});
+			},
+			function(e) {
+				console.log("Error: " + e.message);
+				//getLocation();
+			}, {
+				desiredAccuracy: 3,
+				updateDistance: 10,
+				minimumUpdateTime: 1000 * 10
+			});
 
 
 	}
@@ -185,16 +221,16 @@ var renderMediaPicker = function(container, field, model) {
 
 	if (field.required) {
 		if (imageAssets.length == 0) {
-			setTimeout(function(){
+			setTimeout(function() {
 				addPhoto();
 			}, 1000);
-			
+
 		}
 	}
 
 	var buttons = [{
 		label: 'Add photo',
-		className:"add-photo",
+		className: "add-photo",
 		onTap: function() {
 			addPhoto();
 		}
@@ -202,7 +238,7 @@ var renderMediaPicker = function(container, field, model) {
 	if (field.showVideo !== false) {
 		buttons.push({
 			label: 'Add video',
-			className:"add-video",
+			className: "add-video",
 			onTap: function() {
 				addVideo();
 			}
@@ -279,7 +315,6 @@ var renderBoolean = function(container, field, model) {
 
 
 
-
 var renderButtons = function(container, fields, model) {
 
 
@@ -299,7 +334,7 @@ var renderButtons = function(container, fields, model) {
 
 		if (field.className) {
 
-			button.className+=" "+field.className;
+			button.className += " " + field.className;
 
 		}
 
@@ -350,7 +385,9 @@ var renderIconselect = function(container, field, model) {
 				var image = new imageModule.Image();
 				image.src = imgPath;
 				stackLayout.addChild(image);
-				renderLabel(imageStack, {value:icon.value})
+				renderLabel(imageStack, {
+					value: icon.value
+				})
 
 			})
 			.catch(function(err) {
@@ -382,14 +419,14 @@ var renderIconselect = function(container, field, model) {
 }
 
 
-var renderImage=function(container, url, model, page){
+var renderImage = function(container, url, model, page) {
 	var image = new imageModule.Image();
 
-	var src=url;
-	if(src[0]!=="~"){
-		src='https://' + global.client.getUrl() + "/" +url;
+	var src = url;
+	if (src[0] !== "~") {
+		src = 'https://' + global.client.getUrl() + "/" + url;
 	}
-	
+
 	image.src = src;
 	container.addChild(image);
 	return image;
@@ -413,7 +450,7 @@ var renderButtonset = function(container, field, model, page) {
 		wrapLayout.className = "buttonset " + field.className;
 	}
 	container.addChild(wrapLayout);
-	
+
 
 
 	field.buttons.forEach(function(button) {
@@ -444,13 +481,17 @@ var renderButtonset = function(container, field, model, page) {
 					var image = new imageModule.Image();
 					image.src = imgPath;
 					stackLayout.addChild(image);
-					renderLabel(imageStack, {value:button.label})
+					renderLabel(imageStack, {
+						value: button.label
+					})
 
 				})
 				.catch(function(err) {
 					console.log("Field Button Error: " + err);
 					//Still render the label.
-					renderLabel(imageStack, {value:button.label})
+					renderLabel(imageStack, {
+						value: button.label
+					})
 				});
 
 		} else {
@@ -473,12 +514,12 @@ var renderButtonset = function(container, field, model, page) {
 					}
 				});
 				return;
-			}else if (button.action == 'link') {
+			} else if (button.action == 'link') {
 
 				utilityModule.openUrl(button.link);
 				return;
 
-			}  else if (button.action != 'none') {
+			} else if (button.action != 'none') {
 
 				var topmost = frameModule.topmost();
 				//global.pushSubform(button.form);
@@ -530,8 +571,6 @@ var renderStyle = function(container, field, model, page) {
 		});
 
 }
-
-
 
 
 
@@ -601,28 +640,22 @@ var renderProgressBar = function(container, field, model) {
 
 }
 
-var observableModule = require("data/observable");
 
-function ViewRenderer() {
-
-};
-
-ViewRenderer.prototype=new observableModule.Observable();
 
 
 ViewRenderer.prototype.renderForm = function(container, field, model) {
 
-	var me=this;
+	var me = this;
 
 
 	var button = me.renderButton(container, {
 		label: field.label
 	});
 
-	if(field.value){
+	if (field.value) {
 		model.set(field.name, field.value);
 	}
-	
+
 
 	if (field.persist === true) {
 
@@ -632,7 +665,7 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 			model.set(field.name, data);
 
 		}).catch(function(e) {
-				console.log('failed to get local data: ' + e);
+			console.log('failed to get local data: ' + e);
 		})
 	}
 
@@ -694,8 +727,7 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 
 ViewRenderer.prototype.renderButton = function(container, field, model) {
 
-	var me=this;
-
+	var me = this;
 
 
 
@@ -705,8 +737,8 @@ ViewRenderer.prototype.renderButton = function(container, field, model) {
 	var stackLayout = new stackLayoutModule.StackLayout();
 	stackLayout.orientation = "horizontal";
 
-	if(field.image){
-		renderImage(stackLayout, field.image).className+=" button-image";
+	if (field.image) {
+		renderImage(stackLayout, field.image).className += " button-image";
 	}
 
 	container.addChild(stackLayout);
@@ -722,7 +754,7 @@ ViewRenderer.prototype.renderButton = function(container, field, model) {
 
 	if (field.className) {
 
-		button.className+=" "+field.className;
+		button.className += " " + field.className;
 
 	}
 
@@ -734,9 +766,9 @@ ViewRenderer.prototype.renderButton = function(container, field, model) {
 
 ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 
-	var me=this;
+	var me = this;
 
-	var action=field.action;
+	var action = field.action;
 	console.log('Apply button action ' + action);
 
 	if (action == 'submit') {
@@ -765,18 +797,18 @@ ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 			return;
 		});
 
-	} 
+	}
 
 	if (action == 'form') {
 		button.on(buttonModule.Button.tapEvent, function() {
 			var topmost = frameModule.topmost();
-				//global.pushSubform(button.form);
-				topmost.navigate({
-					moduleName: "views/form/form",
-					context: {
-						form: field.form
-					}
-				});
+			//global.pushSubform(button.form);
+			topmost.navigate({
+				moduleName: "views/form/form",
+				context: {
+					form: field.form
+				}
+			});
 		});
 		return
 	}
@@ -784,36 +816,36 @@ ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 	if (action == 'event') {
 		button.on(buttonModule.Button.tapEvent, function() {
 			var eventData = {
-			  eventName: field.event,
-			  object: this
+				eventName: field.event,
+				object: this
 			};
 			me.notify(eventData);
 		});
 		return
 	}
 
-	console.log('Unknown button tap action: '+action);
+	console.log('Unknown button tap action: ' + action);
 
 
 
 };
 
-ViewRenderer.prototype.renderScroll=function(container, fields, model, page){
-	var me=this;
+ViewRenderer.prototype.renderScroll = function(container, fields, model, page) {
+	var me = this;
 
 	console.log(scrollViewModule.ScrollView);
-	var scrollView=new scrollViewModule.ScrollView();
-	scrollView.orientation="horizontal";
+	var scrollView = new scrollViewModule.ScrollView();
+	scrollView.orientation = "horizontal";
 	var stackLayout = new stackLayoutModule.StackLayout();
-	stackLayout.orientation="horizontal";
+	stackLayout.orientation = "horizontal";
 	container.addChild(scrollView);
-	scrollView.content=stackLayout;
+	scrollView.content = stackLayout;
 	me.renderFieldset(stackLayout, fields.fields, model, page);
 
-}	
+}
 
 ViewRenderer.prototype.renderFieldset = function(container, fields, model, page) {
-	var me=this;
+	var me = this;
 
 
 
@@ -916,33 +948,32 @@ ViewRenderer.prototype.renderFieldset = function(container, fields, model, page)
 
 ViewRenderer.prototype.renderView = function(context, container, model, page) {
 
-	var me=this;
-	var formName="main";
-	if(context){
-		if(context.form){
-    		formName=context.form;
-    	}
-    	if(context.events){
-    		Object.keys(context.events).forEach(function(e){
-    			me.on(e, context.events[e]);
-    		});
-    	}
+	var me = this;
+	var formName = "main";
+	if (context) {
+		if (context.form) {
+			formName = context.form;
+		}
+		if (context.events) {
+			Object.keys(context.events).forEach(function(e) {
+				me.on(e, context.events[e]);
+			});
+		}
 	}
-   
 
 
 
-	var forms=global.parameters.forms;
-    container.className = "form-"+formName;
+	var forms = global.parameters.forms;
+	container.className = "form-" + formName;
 
-    if(typeof forms=='string'&&forms[0]=="{"){
-    	forms=decodeVariable(forms);
-    }
+	if (typeof forms == 'string' && forms[0] == "{") {
+		forms = decodeVariable(forms);
+	}
 
-    var elements=forms[formName];
+	var elements = forms[formName];
 
 
-    if(!elements){
+	if (!elements) {
 		throw 'Invalid form fields: (' + (typeof fields) + ') for ' + formName;
 	}
 

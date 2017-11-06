@@ -2,15 +2,50 @@
 
 
 
-var labelModule = require("ui/label");
-var imageModule = require("ui/image");
-var ImageSource = require("image-source");
+var labelModule;
+var imageModule;
+var ImageSource;
 
-var gridLayoutModule = require("ui/layouts/grid-layout");
-var stackLayoutModule = require("ui/layouts/stack-layout");
+var gridLayoutModule;
+var stackLayoutModule;
 
-var GridLayout = gridLayoutModule.GridLayout;
-var ItemSpec = gridLayoutModule.ItemSpec ;
+var GridLayout;
+var ItemSpec;
+
+
+
+
+function ListViewRenderer(container) {
+
+
+
+ labelModule = require("ui/label");
+ imageModule = require("ui/image");
+ ImageSource = require("image-source");
+
+ gridLayoutModule = require("ui/layouts/grid-layout");
+ stackLayoutModule = require("ui/layouts/stack-layout");
+
+ GridLayout = gridLayoutModule.GridLayout;
+ ItemSpec = gridLayoutModule.ItemSpec ;
+
+
+
+
+	var me=this;
+	var emptyLabel=renderLabel({
+			"value": "loading"
+	});
+	//var empty=renderStack([emptyLabel]);
+	//empty.className="empty";
+	container.addChild(emptyLabel);
+	//me.empty=empty;
+	me.emptyLabel=emptyLabel;
+};
+
+
+
+
 var renderLabel = function(field) {
 
 
@@ -170,17 +205,7 @@ var renderList = function(list, container, model, page) {
 
 }
 
-function ListViewRenderer(container) {
-	var me=this;
-	var emptyLabel=renderLabel({
-			"value": "loading"
-	});
-	//var empty=renderStack([emptyLabel]);
-	//empty.className="empty";
-	container.addChild(emptyLabel);
-	//me.empty=empty;
-	me.emptyLabel=emptyLabel;
-};
+
 
 ListViewRenderer.prototype.renderList = function(list, container, model, page) {
 	var me=this;

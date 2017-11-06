@@ -1,8 +1,13 @@
-var dialogs = require("ui/dialogs");
-var Pusher = require("pusher-nativescript").Pusher;
-var IPublicChannelEventListener = require("pusher-nativescript/interfaces");
+var dialogs;
+var Pusher;
+var IPublicChannelEventListener;
 
 function Messages() {
+
+
+	dialogs = require("ui/dialogs");
+	Pusher = require("pusher-nativescript").Pusher;
+	IPublicChannelEventListener = require("pusher-nativescript/interfaces");
 
 var me=this;
 me.prefix='mobile.';
