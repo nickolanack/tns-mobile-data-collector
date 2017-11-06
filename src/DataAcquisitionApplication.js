@@ -16,7 +16,8 @@ function DataAcquisitionApplication(client, params){
     imageSource = require("image-source");
     frameModule = require("ui/frame");
     dialogs = require("ui/dialogs");
-    template=require('../').Template;
+    var Template=require('../').Template;
+    template=new Template();
 
 	var me=this;
 	me.client=client;
@@ -68,7 +69,7 @@ var createMarker = function(data, callback) {
 
     global.client.createMarker(
         options.layer, {
-            name: data.type + " Report",
+            name: data.type||"Add Name!",
             description: data.description,
             coordinates: data.coordinates,
             style: "DEFAULT"
@@ -183,7 +184,8 @@ var processFormFilePath = function(filepath, countItems, callback) {
                 if(!countItems){
                     countItems=mediaItems.length;
                 }
-                console.log(mediaItems.length + " items to upload");
+                console.log("There are "+mediaItems.length + " items to upload: list:"+JSON.stringify(mediaItems, null, "  "));
+
                 uploadMediaItem(mediaItems[0], countItems-mediaItems.length, countItems).then(function() {
                     //recursive call will upload all mediaItems until done...
                     console.log(mediaItemsThatNeedUploading(data.media).length + " items to upload");
@@ -255,15 +257,30 @@ var uploadMediaItem = function(filename, finished, total) {
 
 
     var savepath = fs.knownFolders.documents().path;
-    var filepath = fs.path.join(savepath, filename);
-    console.log('Upload: ' + filepath);
-    var bghttp = require("nativescript-background-http");
+    var filePath = fs.path.join(savepath, filename);
+    var file = fs.File.fromPath(filePath);
 
+    if(!fs.File.exists(filePath)){
+         throw "File does not exist!!";
+    }
+
+
+    var url='https://' + global.client.getUrl() + "/" + global.client.getPathForTask("image_upload") + "&json={}";
+    var method="POST";
+
+    console.log('Initiating Background Upload: ' + filename);
+    console.log('Post Background '+method+': ' + url);
+    console.log('File Exists! '+filename+" "+file.extension+" "+file.lastModified);
+
+
+    var bghttp = require("nativescript-background-http");
     var session = bghttp.session("image-upload");
 
+    
+
     var request = {
-        url: 'https://' + global.client.getUrl() + "/" + global.client.getPathForTask("image_upload") + "&json={}",
-        method: "POST",
+        url: url,
+        method: method,
         headers: {
             "Content-Type": "application/octet-stream",
             "File-Name": filename
@@ -271,9 +288,32 @@ var uploadMediaItem = function(filename, finished, total) {
         description: "{ 'uploading': '" + filename + "' }"
     };
 
-    var task = session.uploadFile(filepath, request);
+   
+
+    
+    
+   
+
+    var task;
+    var blocked=true;
+    setTimeout(function(){
+        if(blocked){
+            throw "Fuck sakes";
+        }
+    },1000);
+
+    try{
+       task = session.uploadFile(filePath, request);
+    }catch(e){
+        console.log(e);
+    }
+    blocked=false;
+
+    console.log('Generating Promise');
 
     return new Promise(function(resolve, reject) {
+
+        console.log('Executing Promise');
 
 
         indicatorStart(finished, total);
@@ -284,6 +324,7 @@ var uploadMediaItem = function(filename, finished, total) {
             indicatorProgress('Uploading '+(finished+1)+" of "+total, (100 * parseInt(value.currentBytes)*(finished+1)) / (parseInt(value.totalBytes)*total));
         });
         task.on("error", function(err) {
+            console.log("Error");
             console.log(err.eventName);
         });
         task.on("complete", function(response) {
@@ -325,11 +366,8 @@ var hasUrlForMedia = function(filename) {
 
     var documents = fs.knownFolders.documents();
     var filePath = fs.path.join(documents.path, filename) + '.json';
-    console.log('check exists: ' + filePath)
-    var exists = fs.File.exists(filePath);
-    console.log(exists ? "exists" : "not exists");
-    return exists;
-
+    return fs.File.exists(filePath);
+   
 }
 
 

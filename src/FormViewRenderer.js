@@ -54,7 +54,10 @@ try{
 	ViewRenderer.prototype = new observableModule.Observable();
 
 }catch(e){
-	console.error('Unable to extend Observable!!!')
+	/**
+	 * TODO: extend Observable or Mock object in a way that supports unit tests
+	 */
+	console.error('Unable to extend Observable!!!');
 }
 
 

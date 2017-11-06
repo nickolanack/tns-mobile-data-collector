@@ -8,7 +8,7 @@ var client;
 var configuration;
 var configurationName;
 
-function Account(configuration) {
+function Account(config) {
 
 
 	exit = require('nativescript-exit').exit;
@@ -35,7 +35,11 @@ var loadApplication = function() {
 
 var getDevice = function() {
 
+	console.log('Get Device');
+
 	return configuration.getLocalData('device', false).then(function(device) {
+
+		console.log('Local Device');
 
 		if (device) {
 
@@ -51,6 +55,7 @@ var getDevice = function() {
 
 			}).catch(function(err) {
 				console.log('Registration Error: ' + JSON.stringify(err));
+				reject(err);
 			})
 		});
 
@@ -59,6 +64,9 @@ var getDevice = function() {
 
 };
 var getDeviceAccount = function() {
+
+	console.log('Get Device Account');
+
 	return getDevice().then(function(device) {
 
 		console.log('Has Device: ' + JSON.stringify(device));
@@ -88,6 +96,7 @@ var getDeviceAccount = function() {
 
 				}).catch(function(err) {
 					console.log('Account Error: ' + err);
+					reject(err);
 				});
 
 
@@ -102,9 +111,16 @@ var getDeviceAccount = function() {
 
 Account.prototype.login = function() {
 
+	console.log("Account Login 00");
+
 	return new Promise(function(resolve, reject) {
 
+		console.log("Account Login 01");
+
 		getDeviceAccount().then(function(credentials) {
+
+
+			console.log("Account Login XX1");
 
 			client.loginDevice(
 				credentials.device.id,
@@ -113,12 +129,16 @@ Account.prototype.login = function() {
 				credentials.account.password
 			).then(function(user) {
 
+
+				console.log("Account Login XX2");
+
 				console.log('device login');
 				global.setOnline();
 				loadApplication().then(function(config){
 					resolve(config);
 				}).catch(function(err) {
 					console.log('Online Application Error: ' + err);
+					reject(err);
 				});
 
 
@@ -152,6 +172,7 @@ Account.prototype.login = function() {
 							resolve(config);
 						}).catch(function(err) {
 							console.log('Offline Application Error: ' + err);
+							reject(err);
 						});
 					});
 					return;

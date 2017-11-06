@@ -186,11 +186,13 @@ CoreAppClient.prototype.isConnected = function() {
 CoreAppClient.prototype.login = function(username, password) {
 	var me = this;
 
+	console.log('Attemp Login: '+username);
+
 	return me.promise(function(resolve, reject) {
 
 		me.isConnected().then(function() {
 
-
+			console.log('Attemp Login: '+username);
 
 			return me.task("login", {
 				"username": username,
@@ -200,10 +202,15 @@ CoreAppClient.prototype.login = function(username, password) {
 				me._id = user.id;
 				me._token = user.access_token;
 
+				console.log('Login Completed Successfully: '+username);
+
 				resolve(user);
 			})
 
-		}).catch(reject);
+		}).catch(function(e){
+			console.log('Login Failed');
+			reject(e);
+		});
 
 
 	});

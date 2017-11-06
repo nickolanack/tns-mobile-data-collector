@@ -17,7 +17,11 @@ function Configuration(client) {
 	ImageSource = require("image-source");
 	fs = require("file-system");
 
-	template=require('../').Template;
+	var Template=require('../').Template;
+	template=new Template();
+	if(!template.render){
+		throw "Expected Template.render";
+	}
 
 
 	configurationName = global.parameters.configuration;
@@ -254,6 +258,8 @@ Configuration.prototype.getLocalDataModifiedDate = function(name) {
 Configuration.prototype.getLocalData = function(name, defaultValue) {
 
 	var me = this;
+
+	console.log('Get Local Data');
 
 	return new Promise(function(resolve, reject) {
 
@@ -537,13 +543,13 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 
 
 
-Configuration.prototype.decodeVariable=function(arg, template){
+Configuration.prototype.decodeVariable=function(arg, temp){
 
 	//return template.render(arg, JSON.parse(JSON.stringify(me._defaultConfig.parameters)), template)
 
 	var me=this;
 
-	console.log('Decode '+arg+(template?' With template':' No Template'));
+	console.log('Decode '+arg+(temp?' With template':' No Template'));
 
 	if(typeof arg=='string'){
 		var str=arg;
@@ -555,8 +561,8 @@ Configuration.prototype.decodeVariable=function(arg, template){
 				throw 'Invalid decode variable: '+arg;
 			}
 
-			if(template){
-				console.log('Use template: '+template);
+			if(temp){
+				console.log('Use template: '+temp);
 
 				var params=JSON.parse(JSON.stringify(me._defaultConfig.parameters));
 
@@ -565,14 +571,14 @@ Configuration.prototype.decodeVariable=function(arg, template){
 					return value.map(function(v, i){
 						params.value=v;
 						params.index=i;
-						var result= template.render(template, params);
-						console.log('Replaced Array Items '+JSON.stringify(template)+' => '+JSON.stringify(result));
+						var result= template.render(temp, params);
+						console.log('Replaced Array Items '+JSON.stringify(temp)+' => '+JSON.stringify(result));
 						return result;
 					});
 					
 				}else{
 					params.value=value;
-					return template.render(template, params);
+					return template.render(temp, params);
 				}
 
 				
