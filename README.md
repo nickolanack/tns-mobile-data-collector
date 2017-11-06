@@ -14,6 +14,11 @@ define forms, views etc using parameters.json
   "domain":"somedomain.ca", 
   
   /*
+   * name or type of gis application server this parameter is used to determine 
+   * how the app communicates to the server only "core-app" is supported.
+   */
+  "provider":"core-app",
+  /*
    * this could be an object like {parameters:{"key":"value", ...}}
    * if this is a string, then it is used in a request to {domain} for values.
    * once configuration is resolved the app can run offline.
