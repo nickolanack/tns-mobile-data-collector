@@ -6,32 +6,10 @@ var fs;
 
 
 var configurationName;
-var template;
 
 
 
-function Configuration(client) {
 
-
-	ImageCache = require("ui/image-cache").Cache;
-	ImageSource = require("image-source");
-	fs = require("file-system");
-
-	var Template=require('../').Template;
-	template=new Template();
-	if(!template.render){
-		throw "Expected Template.render";
-	}
-
-
-	configurationName = global.parameters.configuration;
-	var me = this;
-	me.client = client;
-	me._refreshCacheItems = true; //use cached items if available
-	me._defaultConfig = false;
-	me._configs = {};
-
-};
 
 var saveImage = function(name, imgSource) {
 
@@ -47,6 +25,11 @@ var saveImage = function(name, imgSource) {
 
 
 var imagePath = function(name) {
+
+
+	if(typeof name !="string"){
+		throw 'Invalid imagePath name: '+(typeof name)+" "+JSON.stringify(name);
+	}
 
 	name=name.split('/').join('.');
 
@@ -121,6 +104,53 @@ var readPath = function(name) {
 	return file.readText();
 }
 
+
+
+var instance;
+
+function Configuration(client) {
+
+	var me=this;
+
+	ImageCache = require("ui/image-cache").Cache;
+	ImageSource = require("image-source");
+	fs = require("file-system");
+
+	var Template=require('../').Template;
+
+	me._template=new Template();
+	if(!me._template.render){
+		throw "Expected Template.render";
+	}
+
+	
+
+
+	configurationName = global.parameters.configuration;
+	var me = this;
+	me.client = client;
+	me._refreshCacheItems = true; //use cached items if available
+	me._defaultConfig = false;
+	me._configs = {};
+
+
+	if(instance){
+        throw 'Singleton class instance has already been created! use Configuration.SharedInstance()';
+    }
+    instance=me;
+
+};
+
+
+Configuration.SharedInstance=function(){
+    if(!instance){
+        throw 'Singleton class requires instantiation';
+    }
+    return instance;
+}
+
+
+
 Configuration.prototype.hasConfiguration = function(name) {
 	return hasConfig(name);
 }
@@ -133,6 +163,10 @@ Configuration.prototype.refreshCacheItems = function() {
 	me._refreshCacheItems = true;
 }
 
+
+Configuration.prototype.getDefaultName = function() {
+	return global.parameters.configuration;
+}
 
 Configuration.prototype.prepareDefaultConfig = function(obj) {
 
@@ -317,7 +351,17 @@ Configuration.prototype._get = function(path, config) {
 
 }
 
+Configuration.prototype.getDefaultParameters = function() {
 
+	var me=this;
+
+	if (!me._defaultConfig) {
+		throw 'Configuration not set';
+	}
+
+	return me._defaultConfig.parameters;
+
+}
 
 Configuration.prototype.get = function(name, defaultValue) {
 	var me = this;
@@ -329,14 +373,18 @@ Configuration.prototype.get = function(name, defaultValue) {
 
 	var value=me._get(name, me._defaultConfig.parameters);
 	if (value!==null) {
-		return value;
+		return me._template.render(value, me.getDefaultParameters());
 
 	}
 
 	if (typeof defaultValue != 'undefined') {
 
+		if(typeof defaultValue=='function'){
+			defaultValue=defaultValue();
+		}
+
 		console.log("get config: " + name + " does not exist: using default: "+JSON.stringify(defaultValue, null, '  '));
-		return defaultValue;
+		return me._template.render(defaultValue, me.getDefaultParameters());
 
 	}
 
@@ -511,7 +559,10 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 		}
 
 
-		var url = "https://" + me.client.getUrl() + '/' + urlPath;
+		var url =urlPath;
+		if(url.indexOf('https://')!==0){
+			 url="https://" + me.client.getUrl() + '/' + urlPath;
+		}
 		// Try to read the stylesheet from the cache
 		console.log("stylesheet: " + url);
 		fetch(url)
@@ -541,56 +592,6 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 
 };
 
-
-
-Configuration.prototype.decodeVariable=function(arg, temp){
-
-	//return template.render(arg, JSON.parse(JSON.stringify(me._defaultConfig.parameters)), template)
-
-	var me=this;
-
-	console.log('Decode '+arg+(temp?' With template':' No Template'));
-
-	if(typeof arg=='string'){
-		var str=arg;
-		if(str[0]==='{'&&str[str.length-1]==='}'){
-			//console.log(str.substring(1, str.length-1));
-			var value= global.configuration.get(str.substring(1, str.length-1), str);
-			if(value===null){
-				console.log('Invalid decode variable: '+arg);
-				throw 'Invalid decode variable: '+arg;
-			}
-
-			if(temp){
-				console.log('Use template: '+temp);
-
-				var params=JSON.parse(JSON.stringify(me._defaultConfig.parameters));
-
-				if(Object.prototype.toString.call(value) == "[object Array]"){
-
-					return value.map(function(v, i){
-						params.value=v;
-						params.index=i;
-						var result= template.render(temp, params);
-						console.log('Replaced Array Items '+JSON.stringify(temp)+' => '+JSON.stringify(result));
-						return result;
-					});
-					
-				}else{
-					params.value=value;
-					return template.render(temp, params);
-				}
-
-				
-			}
-
-			console.log(' => '+JSON.stringify(value));
-
-			return value;
-		}
-	}
-	return arg;
-}
 
 
 

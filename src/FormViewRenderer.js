@@ -5,7 +5,7 @@ var labelModule;
 var textFieldModule;
 var listPickerModule;
 var switchModule;
-var geolocation;
+
 var camera;
 var video;
 var stackLayoutModule;
@@ -25,14 +25,17 @@ var progressModule;
 
 var utilityModule;
 
-
+var instance;
 
 function ViewRenderer() {
+
+
+	var me = this;
+
 	labelModule = require("ui/label");
 	textFieldModule = require("ui/text-field");
 	listPickerModule = require("ui/list-picker");
 	switchModule = require("ui/switch");
-	geolocation = require("nativescript-geolocation");
 	camera = require("nativescript-camera");
 	video = require("nativescript-videorecorder");
 	stackLayoutModule = require("ui/layouts/stack-layout");
@@ -46,14 +49,34 @@ function ViewRenderer() {
 	frameModule = require("ui/frame");
 	progressModule = require("ui/progress");
 	utilityModule = require("utils/utils");
+
+
+	if (instance) {
+		throw 'Singleton class instance has already been created! use ViewRenderer.SharedInstance()';
+	}
+	instance = me;
+
+
 };
 
-try{
-	
+
+
+ViewRenderer.SharedInstance = function() {
+
+	if (!instance) {
+		throw 'Singleton class requires instantiation';
+	}
+	return instance
+
+}
+
+
+try {
+
 	var observableModule = require("data/observable");
 	ViewRenderer.prototype = new observableModule.Observable();
 
-}catch(e){
+} catch (e) {
 	/**
 	 * TODO: extend Observable or Mock object in a way that supports unit tests
 	 */
@@ -61,11 +84,80 @@ try{
 }
 
 
-var decodeVariable = function(str, template) {
+ViewRenderer.prototype.currentView = function() {
+	var me = this;
+	return me._viewName;
+};
 
-	console.log('Decoding Variable ' + str);
-	return global.configuration.decodeVariable(str, template);
+
+
+ViewRenderer.prototype._app = function() {
+	return require('tns-mobile-data-collector').DataAcquisitionApplication.SharedInstance();
 }
+
+ViewRenderer.prototype._config = function() {
+	return require('../').Configuration.SharedInstance();
+}
+
+var getConfiguration = function() {
+	return instance._config();
+}
+var decodeVariable = function(str, template) {
+	return instance._parse(str, template);
+}
+
+
+ViewRenderer.prototype._parse = function(str, template) {
+
+
+	var me=this;
+	
+	if(!me._template){
+		var Template = require('../').Template;
+		me._template=new Template();
+	}
+
+	var params=JSON.parse(JSON.stringify(me._config().getDefaultParameters()));
+	params.data=JSON.parse(JSON.stringify(me.getCurrentFormData()));
+
+
+	return me._template.render(str, params, template);
+
+}
+
+ViewRenderer.prototype._bind = function(str, callback) {
+
+	var me=this;
+	callback(decodeVariable(str));
+	if(me._shouldBindToData(str)){
+		me._bindToDataChangeEvents(str, callback);
+	}
+
+}
+
+ViewRenderer.prototype._shouldBindToData = function(str) {
+	if(str.indexOf('{data.')>=0){
+		return true;
+	}
+}
+
+
+ViewRenderer.prototype._bindToDataChangeEvents = function(str, callback) {
+	var me=this;
+	me._model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
+		callback(decodeVariable(str));
+    });
+}
+
+
+ViewRenderer.prototype._addDataChangeEvents = function(str, callback) {
+	var me=this;
+	me._model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
+		callback(decodeVariable(str));
+    });
+}
+
+
 
 
 
@@ -74,19 +166,33 @@ var renderHeading = function(container, field) {
 
 
 	var label = new labelModule.Label();
-	label.text = decodeVariable(field.value);
+	instance._bind(field.value, function(value){
+		label.text=value
+	});
 	label.className = "heading";
 	label.textWrap = true;
 	container.addChild(label);
 
 }
+var renderLabel=function(container, field) {
+	return instance.renderLabel(container, field);
+}
 
-var renderLabel = function(container, field) {
 
 
+
+
+ViewRenderer.prototype.renderLabel = function(container, field) {
+
+	var me=this;
 
 	var label = new labelModule.Label();
-	label.text = decodeVariable(field.value);
+	var value = decodeVariable(field.value);
+
+	instance._bind(field.value, function(value){
+		label.text=value
+	});
+
 	label.className = "label";
 	label.textWrap = true;
 	container.addChild(label);
@@ -104,20 +210,28 @@ var renderHtml = function(container, field) {
 }
 
 
-var renderLocation = function(container, field, model) {
+ViewRenderer.prototype.renderLocation = function(container, field, model) {
+
+	var me = this;
 
 
-	var getLocation = function() {
+	if (field.field) {
+		console.log('Render location field');
+		model.set(field.name, [0, 0]);
+		me.renderField(container, field.field, model);
+	}
+
+	me._app().requireAccessToGPS().then(function(geolocation) {
 
 		console.log('Requesting location');
 
-		model.set('coordinates', [0, 0]);
 
 		var location = geolocation.watchLocation(
 			function(loc) {
+
 				if (loc) {
 					console.log("Current location is: " + JSON.stringify(loc));
-					model.set('coordinates', [loc.latitude, loc.longitude]);
+					model.set(field.name, [loc.latitude, loc.longitude]);
 				}
 
 			},
@@ -131,124 +245,112 @@ var renderLocation = function(container, field, model) {
 			});
 
 
-	}
-
-
-	// if (geolocation.isEnabled()) {
-	//	getLocation();
-	// 	return;
-	// }
-
-
-
-	console.log('Location requests are not enabled. Attempting to enable.')
-	geolocation.enableLocationRequest().then(function() {
-		console.log(arguments);
-		getLocation();
-	}).catch(function(e) {
-		console.log(arguments);
 	});
-
 
 
 }
 
 
 
-var renderMediaPicker = function(container, field, model) {
+ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 
-	camera.requestPermissions()
+	var me = this;
 
 	var wrapLayout = new wrapLayoutModule.WrapLayout();
 	wrapLayout.className = "media-selection";
 	container.addChild(wrapLayout);
 
+	me._app().requireAccessToCamera().then(function(camera) {
 
 
-	var imageAssets = [];
-	model.set(field.name, imageAssets);
+		var imageAssets = [];
+		model.set(field.name, imageAssets);
 
-	var addPhoto = function() {
+		var addPhoto = function() {
 
 
 
-		camera.takePicture({
-				width: 500,
-				height: 500,
-				keepAspectRatio: true,
-				saveToGallery: true
-			})
-			.then(function(imageAsset) {
-				var image = new imageModule.Image();
-				image.src = imageAsset;
-				global.storeImageSource(imageAsset).then(function(filename) {
+			camera.takePicture({
+					width: 500,
+					height: 500,
+					keepAspectRatio: true,
+					saveToGallery: true
+				})
+				.then(function(imageAsset) {
+					var image = new imageModule.Image();
+					image.src = imageAsset;
+					global.storeImageSource(imageAsset).then(function(filename) {
 
-					//Note: I was recieving an out of memory error until I set imageAsset to null
-					imageAsset = null;
+						//Note: I was recieving an out of memory error until I set imageAsset to null
+						imageAsset = null;
 
-					imageAssets.push(filename);
-					model.set(field.name, imageAssets);
-					console.log('Took picture');
+						imageAssets.push(filename);
+						model.set(field.name, imageAssets);
+						console.log('Took picture');
+
+					}).catch(function(err) {
+						console.log("Error -> " + err.message);
+					});
+					wrapLayout.addChild(image);
+
 
 				}).catch(function(err) {
 					console.log("Error -> " + err.message);
 				});
-				wrapLayout.addChild(image);
-
-
-			}).catch(function(err) {
-				console.log("Error -> " + err.message);
-			});
-	}
-
-
-	var addVideo = function() {
-
-		console.log("add video");
-
-		var videorecorder = new video.VideoRecorder();
-		var options = {
-
-			explanation: "Why do i need this permission" //optional on api 23 #android
 		}
 
-		videorecorder.record(options)
-			.then((data) => {
-				console.log(data.file)
-			})
-			.catch((err) => {
-				console.log(err)
-			})
 
-	}
+		var addVideo = function() {
 
-	if (field.required) {
-		if (imageAssets.length == 0) {
-			setTimeout(function() {
-				addPhoto();
-			}, 1000);
+			console.log("add video");
 
-		}
-	}
+			var videorecorder = new video.VideoRecorder();
+			var options = {
 
-	var buttons = [{
-		label: 'Add photo',
-		className: "add-photo",
-		onTap: function() {
-			addPhoto();
-		}
-	}];
-	if (field.showVideo !== false) {
-		buttons.push({
-			label: 'Add video',
-			className: "add-video",
-			onTap: function() {
-				addVideo();
+				explanation: "Why do i need this permission" //optional on api 23 #android
 			}
-		})
-	}
 
-	renderButtons(container, buttons);
+			videorecorder.record(options)
+				.then((data) => {
+					console.log(data.file)
+				})
+				.catch((err) => {
+					console.log(err)
+				})
+
+		}
+
+		if (field.required) {
+			if (imageAssets.length == 0) {
+				setTimeout(function() {
+					addPhoto();
+				}, 1000);
+
+			}
+		}
+
+		var buttons = [{
+			label: 'Add photo',
+			className: "add-photo",
+			onTap: function() {
+				addPhoto();
+			}
+		}];
+		if (field.showVideo !== false) {
+			buttons.push({
+				label: 'Add video',
+				className: "add-video",
+				onTap: function() {
+					addVideo();
+				}
+			})
+		}
+
+		renderButtons(wrapLayout, buttons);
+
+
+
+	});
 
 
 
@@ -358,7 +460,15 @@ var renderIconselect = function(container, field, model) {
 	var buttons = [];
 	var clearSelected = function() {
 		buttons.forEach(function(b) {
-			b.className = "icon";
+
+			var c = b.className.split(' ');
+			var i = c.indexOf("selected");
+			if (i >= 0) {
+				c.splice(i, 1);
+			}
+			var className = c.join(' ');
+			console.log(b.className + " -> " + className);
+			b.className = className;
 		});
 	}
 
@@ -378,12 +488,9 @@ var renderIconselect = function(container, field, model) {
 
 
 
-		global.configuration.getIcon(icon.icon)
-			// .then(function(config){
-			// 	console.log('Got Config');
-			// 	return global.configuration.getImage(icon.icon, config.parameters[icon.icon]);
-			// })
-			.then(function(imgPath) {
+		getConfiguration().getIcon(icon.icon)
+
+		.then(function(imgPath) {
 
 				var image = new imageModule.Image();
 				image.src = imgPath;
@@ -441,8 +548,15 @@ var renderButtonset = function(container, field, model, page) {
 	var buttons = [];
 	var clearSelected = function() {
 		buttons.forEach(function(b) {
-			console.log(b.className);
-			b.className = "icon";
+
+			var c = b.className.split(' ');
+			var i = c.indexOf("selected");
+			if (i >= 0) {
+				c.splice(i, 1);
+			}
+			var className = c.join(' ');
+			console.log(b.className + " -> " + className);
+			b.className = className;
 		});
 	}
 
@@ -469,16 +583,13 @@ var renderButtonset = function(container, field, model, page) {
 			stackLayout.className = "icon " + button.className;
 		}
 
-
+		var onTapFns = [];
 		if (button.icon) {
 
 
 
-			global.configuration.getImage(button.icon)
-				// .then(function(config){
-				// 	return global.configuration.getImage(button.icon, config.parameters[button.icon]);
+			getConfiguration().getImage(button.icon)
 
-			// })
 			.then(function(imgPath) {
 
 					var image = new imageModule.Image();
@@ -487,6 +598,11 @@ var renderButtonset = function(container, field, model, page) {
 					renderLabel(imageStack, {
 						value: button.label
 					})
+
+
+					// onTapFns.push(function() {
+					// 	image.className = "spin-fast";
+					// })
 
 				})
 				.catch(function(err) {
@@ -505,17 +621,23 @@ var renderButtonset = function(container, field, model, page) {
 		stackLayout.on(buttonModule.Button.tapEvent, function(args) {
 
 			console.log('Tap');
+			onTapFns.forEach(function(fn) {
+				fn();
+			})
 
 			if (button.action == 'form') {
 
-				var topmost = frameModule.topmost();
-				//global.pushSubform(button.form);
-				topmost.navigate({
-					moduleName: "views/form/form",
-					context: {
-						form: button.form
-					}
-				});
+				setTimeout(function() {
+					var topmost = frameModule.topmost();
+					//global.pushSubform(button.form);
+					topmost.navigate({
+						moduleName: "views/form/form",
+						context: {
+							form: button.form
+						}
+					});
+				}, 500);
+
 				return;
 			} else if (button.action == 'link') {
 
@@ -557,12 +679,9 @@ var renderSpace = function(container, field) {
 var renderStyle = function(container, field, model, page) {
 
 
-	global.configuration.getStyle(field.stylename)
-		// .then(function(config){
-		// 	console.log('Got Config');
-		// 	return global.configuration.getImage(icon.icon, config.parameters[icon.icon]);
-		// })
-		.then(function(stylePath) {
+	getConfiguration().getStyle(field.stylename)
+
+	.then(function(stylePath) {
 
 
 			console.log(stylePath);
@@ -645,7 +764,6 @@ var renderProgressBar = function(container, field, model) {
 
 
 
-
 ViewRenderer.prototype.renderForm = function(container, field, model) {
 
 	var me = this;
@@ -663,7 +781,7 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 	if (field.persist === true) {
 
 
-		global.configuration.getLocalData(field.name, {}).then(function(data) {
+		getConfiguration().getLocalData(field.name, {}).then(function(data) {
 
 			model.set(field.name, data);
 
@@ -672,13 +790,14 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 		})
 	}
 
+	button.className = "subform";
 	button.on(buttonModule.Button.tapEvent, function(args) {
 
 		var callback = null;
 		if (field.persist === true) {
 			callback = function(data) {
 				console.log('Returned From Subform: ' + JSON.stringify(data))
-				global.configuration.setLocalData(field.name, data).then(function() {
+				getConfiguration().setLocalData(field.name, data).then(function() {
 					console.log('wrote local: ' + field.name);
 				})
 			};
@@ -689,7 +808,10 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 		global.pushSubform(field.name, callback);
 
 		if (field.persist === true) {
-			global.configuration.getLocalData(field.name, {}).then(function(data) {
+
+			//save form data locally and auto fill.
+
+			getConfiguration().getLocalData(field.name, {}).then(function(data) {
 				global.setFormData(data);
 
 				var topmost = frameModule.topmost();
@@ -722,7 +844,6 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 		});
 	});
 
-	button.className = "subform";
 
 
 }
@@ -741,7 +862,7 @@ ViewRenderer.prototype.renderButton = function(container, field, model) {
 	stackLayout.orientation = "horizontal";
 
 	if (field.image) {
-		renderImage(stackLayout, field.image).className += " button-image";
+		var image = renderImage(stackLayout, field.image).className += " button-image";
 	}
 
 	container.addChild(stackLayout);
@@ -850,108 +971,180 @@ ViewRenderer.prototype.renderScroll = function(container, fields, model, page) {
 ViewRenderer.prototype.renderFieldset = function(container, fields, model, page) {
 	var me = this;
 
-
-
 	fields.forEach(function(field) {
-
-		if (field.type == 'heading') {
-			renderHeading(container, field, model);
-			return;
-		}
-
-		if (field.type == 'label') {
-			renderLabel(container, field, model);
-			return;
-		}
-
-		if (field.type == 'media') {
-			renderMediaPicker(container, field, model);
-			return;
-		}
-
-		if (field.type == 'textfield') {
-			renderTextField(container, field, model);
-			return;
-		}
-
-		if (field.type == 'optionlist') {
-			renderOptionList(container, field, model);
-			return;
-		}
-		if (field.type == 'boolean') {
-			renderBoolean(container, field, model);
-			return;
-		}
-
-		if (field.type == 'iconselect') {
-			renderIconselect(container, field, model);
-			return;
-		}
-
-
-		if (field.type == 'space') {
-			renderSpace(container, field, model);
-			return;
-		}
-
-		if (field.type == 'location') {
-			renderLocation(container, field, model);
-			return;
-		}
-
-		if (field.type == 'form') {
-			me.renderForm(container, field, model);
-			return;
-		}
-
-		if (field.type == 'button') {
-			me.renderButton(container, field, model);
-			return;
-		}
-
-		if (field.type == 'buttonset') {
-			renderButtonset(container, field, model, page);
-			return;
-		}
-
-		if (field.type == 'progressbar') {
-			renderProgressBar(container, field, model, page);
-			return;
-		}
-
-		if (field.type == 'style') {
-			renderStyle(container, field, model, page);
-			return;
-		}
-		if (field.type == 'scroll') {
-			me.renderScroll(container, field, model, page);
-			return;
-		}
-		if (field.type == 'image') {
-			renderImage(container, field.image, model, page);
-			return;
-		}
-		if (field.type == 'html') {
-			renderHtml(container, field, model, page);
-			return;
-		}
-
-		if (field.type == 'data') {
-			Object.keys(field.data).forEach(function(k) {
-				console.log('add form data: ' + k + ' ' + field.data[k]);
-				model.set(k, field.data[k]);
-			});
-			return;
-		}
-
-		console.log('Unknown field type: ' + field.type + ': ' + JSON.stringify(field));
-
+		me.renderField(container, field, model, page);
 	});
 }
 
-ViewRenderer.prototype.renderView = function(context, container, model, page) {
+ViewRenderer.prototype.renderField = function(container, field, model, page) {
+
 
 	var me = this;
+
+
+	if (!field) {
+		throw 'Requires a field!'
+	}
+
+	if (!field.type) {
+		throw 'Field must have a type! ' + JSON.stringify(field, null, "   ")
+	}
+
+	if (field.type == 'heading') {
+		renderHeading(container, field, model);
+		return;
+	}
+
+	if (field.type == 'label') {
+		renderLabel(container, field, model);
+		return;
+	}
+
+	if (field.type == 'media') {
+		me.renderMediaPicker(container, field, model);
+		return;
+	}
+
+	if (field.type == 'textfield') {
+		renderTextField(container, field, model);
+		return;
+	}
+
+	if (field.type == 'optionlist') {
+		renderOptionList(container, field, model);
+		return;
+	}
+	if (field.type == 'boolean') {
+		renderBoolean(container, field, model);
+		return;
+	}
+
+	if (field.type == 'iconselect') {
+		renderIconselect(container, field, model);
+		return;
+	}
+
+
+	if (field.type == 'space') {
+		renderSpace(container, field, model);
+		return;
+	}
+
+	if (field.type == 'location') {
+		me.renderLocation(container, field, model);
+		return;
+	}
+
+	if (field.type == 'form') {
+		me.renderForm(container, field, model);
+		return;
+	}
+
+	if (field.type == 'button') {
+		me.renderButton(container, field, model);
+		return;
+	}
+
+	if (field.type == 'buttonset') {
+		renderButtonset(container, field, model, page);
+		return;
+	}
+
+	if (field.type == 'progressbar') {
+		renderProgressBar(container, field, model, page);
+		return;
+	}
+
+	if (field.type == 'style') {
+		renderStyle(container, field, model, page);
+		return;
+	}
+	if (field.type == 'scroll') {
+		me.renderScroll(container, field, model, page);
+		return;
+	}
+	if (field.type == 'image') {
+		renderImage(container, field.image, model, page);
+		return;
+	}
+	if (field.type == 'html') {
+		renderHtml(container, field, model, page);
+		return;
+	}
+
+	if (field.type == 'data') {
+		Object.keys(field.data).forEach(function(k) {
+			console.log('add form data: ' + k + ' ' + field.data[k]);
+			model.set(k, field.data[k]);
+		});
+		return;
+	}
+
+	console.log('Unknown field type: ' + field.type + ': ' + JSON.stringify(field));
+
+}
+
+ViewRenderer.prototype.hasView = function(formName) {
+
+	var forms = global.parameters.views;
+
+	if (typeof forms == 'string' && forms[0] == "{") {
+		forms = decodeVariable(forms);
+	}
+
+	return !!forms[formName];
+
+
+}
+
+
+ViewRenderer.prototype.getCurrentFormData = function() {
+	var me = this;
+
+	var data = {};
+	Object.keys(me._model).forEach(function(k) {
+		if (k.indexOf('_') === 0) {
+			return;
+		}
+		data[k] = me._model[k];
+	});
+
+
+	console.log("Current Form Data: " + JSON.stringify(data, null, "   "));
+	return JSON.parse(JSON.stringify(data));
+}
+
+ViewRenderer.prototype.setCurrentFormData = function(data) {
+
+	var me = this;
+
+	console.log('Set Model Data From Form Data: ' + JSON.stringify(data) + " For Current View: " + global.getSubformName());
+	Object.keys(data).forEach(function(k) {
+		console.log('set ' + k + '=' + data[k]);
+		me._model.set(k, data[k]);
+	});
+}
+
+ViewRenderer.prototype.renderView = function(page, model) {
+
+	var me = this;
+	me._model = model;
+	me._page = page;
+
+
+	model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
+        console.log('on '+data.propertyName+' changed: '+ data.value);
+        //console.log('Property Changed '+JSON.stringify(data));
+        //console.log('Properties '+JSON.stringify(page.bindingContext));
+    });
+
+
+	page.bindingContext = model;
+
+
+	var context = page.navigationContext;
+	var container = page.getViewById("container");
+
 	var formName = "main";
 	if (context) {
 		if (context.form) {
@@ -964,9 +1157,10 @@ ViewRenderer.prototype.renderView = function(context, container, model, page) {
 		}
 	}
 
+	me._viewName = formName;
 
 
-	var forms = global.parameters.forms;
+	var forms = global.parameters.views;
 	container.className = "form-" + formName;
 
 	if (typeof forms == 'string' && forms[0] == "{") {
@@ -976,17 +1170,27 @@ ViewRenderer.prototype.renderView = function(context, container, model, page) {
 	var elements = forms[formName];
 
 
+	if (typeof elements == 'string' && elements[0] == "{") {
+		elements = decodeVariable(elements);
+	}
+
 	if (!elements) {
 		throw 'Invalid form fields: (' + (typeof fields) + ') for ' + formName;
 	}
 
 	me.renderFieldset(container, elements, model, page);
+
 	var data = global.getFormData();
-	console.log('Set Model Data From Form Data: ' + JSON.stringify(data) + " For Current View: " + global.getSubformName());
-	Object.keys(data).forEach(function(k) {
-		console.log('set ' + k + '=' + data[k]);
-		model.set(k, data[k]);
-	});
+	me.setCurrentFormData(data);
+	me.getCurrentFormData();
+
+
+	var eventData = {
+		eventName: "renderedView",
+		object: this
+	};
+
+	me.notify(eventData);
 
 }
 

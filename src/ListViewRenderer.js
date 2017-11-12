@@ -1,6 +1,7 @@
 "use strict";
-
-
+/**
+ * Deprecated going to replace with FormViewRenderer!
+ */
 
 var labelModule;
 var imageModule;
@@ -12,7 +13,9 @@ var stackLayoutModule;
 var GridLayout;
 var ItemSpec;
 
-
+var getConfiguration=function(){
+	 return require('../').Configuration.SharedInstance();
+}
 
 
 function ListViewRenderer(container) {
@@ -194,7 +197,7 @@ var renderList = function(list, container, model, page) {
 	});
 	
 	grid(container, renderImage("~/bcwf-logo-filled-140.png"),renderLabel({
-			"value": "Created Account, "+moment(global.configuration.getLocalDataModifiedDate("account")).fromNow()
+			"value": "Created Account, "+moment(getConfiguration().getLocalDataModifiedDate("account")).fromNow()
 		})).className="second-last";
 	grid(container, null,null).className="last";
 

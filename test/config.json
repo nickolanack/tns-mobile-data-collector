@@ -1,0 +1,235 @@
+        {
+	"parameters": {
+		"domain": "somedomain.ca",
+		"provider": "core-app",
+		"layer": 1,
+		"configuration": "mobile-app-config",
+		"style": "app-style",
+		"marker": [
+			"name",
+			"description:{media|html}{description}",
+			"location"
+		],
+		"attributes": {
+			"markerAttributes": [
+				"type"
+			]
+		},
+		"forms": {
+			"terms": [{
+				"type": "html",
+				"value": "{terms}"
+			}, {
+				"type": "button",
+				"label": "I Accept",
+				"action": "event",
+				"event": "accept"
+			}],
+			"tutorial": [{
+				"type": "button",
+				"label": "Skip",
+				"action": "event",
+				"event": "complete"
+			}, {
+				"type": "scroll",
+				"direction": "horizontal",
+				"fields": [{
+					"type": "image",
+					"image": "~/tutorial-report.png"
+				}, {
+					"type": "image",
+					"image": "~/tutorial-folder.png"
+				}, {
+					"type": "image",
+					"image": "~/tutorial-survey.png"
+				}, {
+					"type": "image",
+					"image": "~/tutorial-map.png"
+				}]
+			}],
+			"menu": [{
+				"type": "buttonset",
+				"buttons": [{
+					"label": "{map-label}",
+					"action": "map",
+					"icon": "map"
+				}, {
+					"label": "{folder-label}",
+					"action": "list",
+					"icon": "folder"
+				}, {
+					"label": "{downloads-label}",
+					"action": "form",
+					"form": "downloads",
+					"icon": "downloads"
+				}]
+			}, {
+				"type": "buttonset",
+				"className": "create-report btn-main",
+				"buttons": [{
+					"label": "{create-marker-label}",
+					"action": "form",
+					"form": "create-report",
+					"icon": "create-marker"
+				}]
+			}, {
+				"type": "space"
+			}, {
+				"type": "progressbar"
+			}, {
+				"type": "buttonset",
+				"buttons": [{
+					"label": "Survey",
+					"action": "link",
+					"icon": "survey",
+					"link": "https://docs.google.com/forms/d/1KX3Cc6Wz2bQ3mQS0rk5d32hrmbMBaaCfHxuRE86sJYA/viewform",
+					"className": "small-icon"
+				}, {
+					"label": "About",
+					"action": "form",
+					"form": "about",
+					"icon": "about",
+					"className": "small-icon"
+				}]
+			}],
+			"about": [{
+				"type": "heading",
+				"value": "The Alpine Club"
+			}, {
+				"type": "label",
+				"value": "The Alpine Club App is property of The Alpine Club."
+			}, {
+				"type": "label",
+				"value": "This App was designed in The Spice Lab at UBC and uses Geolive, a particapatory mapping framework."
+			}, {
+				"type": "label",
+				"value": "{domain}"
+			}],
+			"create-report": [{
+				"type": "style",
+				"stylename": "app-style"
+			}, {
+				"type": "heading",
+				"value": "Alpine Club Add Feature"
+			}, {
+				"type": "label",
+				"value": "Image or Video"
+			}, {
+				"type": "media",
+				"name": "media",
+				"required": true,
+				"showVideo": false
+			}, {
+				"type": "location",
+				"name": "location"
+			}, {
+				"type": "label",
+				"value": "Category"
+			}, {
+				"type": "iconselect",
+				"name": "type",
+				"value": "{value.name}",
+				"icons": "{mobile-app-markers.iconset}",
+				"placeholder": "violation type",
+				"focus": "",
+				"defaultColor": "#FFFFFF",
+				"selectedColor": "#007AFF",
+				"color": "{{value.name|lower}-color-active}",
+				"template": {
+					"value": "{value.name}",
+					"icon": "{{value.name|lower}.0}"
+				}
+			}, {
+				"type": "space"
+			}, {
+				"className": "submit",
+				"type": "button",
+				"label": "Send",
+				"action": "submit"
+			}],
+			"folder": [{
+				"type": "heading",
+				"value": "Your Waypoints"
+			}, {
+				"type": "list",
+				"values": "getUsersList",
+				"empty": "You have not created any waypoints"
+			}],
+			"downloads": [{
+				"type": "heading",
+				"value": "Downloads"
+			}]
+		},
+		"provisioningKey": "2cmWG-3we5aJxcAJ-X4skJ",
+		"appLogo": [
+			"components/com_geolive/users_files/user_files_20/Uploads/[ImAgE]_kdO_[G]_HqE_8hq.png"
+		],
+		"splashScreenDuration": "2",
+		"create-marker": [
+			"components/com_geolive/users_files/user_files_20/Uploads/Cin_[G]_agc_m6z_[ImAgE].png"
+		],
+		"create-marker-label": "Add Waypoint",
+		"map": [
+			"components/com_geolive/users_files/user_files_20/Uploads/[G]_[ImAgE]_jBt_Eiq_7Xd.png"
+		],
+		"map-label": "Map",
+		"folder": [
+			"components/com_geolive/users_files/user_files_20/Uploads/[G]_TW_[ImAgE]_kMg_jYe.png"
+		],
+		"folder-label": "Timeline",
+		"downloads": [
+			"components/com_geolive/users_files/user_files_20/Uploads/Gc9_1EX_[G]_3ST_[ImAgE].png"
+		],
+		"downloads-label": "More ...",
+		"dialog-offline-title": "Offline Mode",
+		"dialog-offline-message": "This app can run offline but will require an internet connection at a later date to submit forms",
+		"dialog-offlineunavailable-title": "Unable to connect to app server",
+		"dialog-offlineunavailable-message": "This app needs to connect to the internet on first use.",
+		"dialog-processqueue-title": "Sending Offline Forms",
+		"dialog-processqueue-message": "There are {{list.length}} offline forms to submit",
+		"dialog-addqueueitem-title": "Form Queued",
+		"dialog-addqueueitem-message": "This form will be submitted the next time you connect to the internet",
+		"dialog-submitformerror-title": "Failed to submit form",
+		"dialog-submitformerror-message": "Don't worry we'll keep trying",
+		"dialog-submitform-title": "Form Submited",
+		"app-style": "https://alpine.geolive.ca/app-style.content",
+		"survey": [],
+		"about": [],
+		"includes": [
+			"mobile-app-markers",
+			""
+		],
+		"terms": "I promise to use this app for good",
+		"wildlife": [
+			"components/com_geolive/users_files/user_files_23/Uploads/Oi1_[ImAgE]_[G]_V24_hdh.png"
+		],
+		"wildlife-color": "rgb(117, 117, 0)",
+		"wildlife-color-active": "rgb(140, 0, 140)",
+		"water": [
+			"components/com_geolive/users_files/user_files_23/Uploads/wb1_[ImAgE]_D8r_Z1f_[G].png"
+		],
+		"water-color": "rgb(0, 0, 93)",
+		"water-color-active": "rgb(0,0,0)",
+		"rocks": [
+			"components/com_geolive/users_files/user_files_23/Uploads/md_crU_sjw_[G]_[ImAgE].png"
+		],
+		"rocks-color": "rgb(218, 167, 0)",
+		"rocks-color-active": "rgb(0,0,0)",
+		"plants": [
+			"components/com_geolive/users_files/user_files_23/Uploads/[ImAgE]_nEX_DRz_NMi_[G].png"
+		],
+		"plants-color": "rgb(0, 93, 0)",
+		"plants-color-active": "rgb(0,0,0)",
+		"humans": [
+			"components/com_geolive/users_files/user_files_23/Uploads/Fhd_bpY_[G]_[ImAgE]_LG.png"
+		],
+		"humans-color": "rgb(194, 19, 19)",
+		"humans-color-active": "rgb(0,0,0)",
+		"bragging": [
+			"components/com_geolive/users_files/user_files_23/Uploads/qNR_rJh_[G]_[ImAgE]_58.png"
+		],
+		"bragging-color": "rgb(0, 128, 128)",
+
+		"bragging-color-active": "rgb(0,0,0)"
+	}
+}

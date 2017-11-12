@@ -23,7 +23,36 @@ define forms, views etc using parameters.json
    * if this is a string, then it is used in a request to {domain} for values.
    * once configuration is resolved the app can run offline.
    */
-  "configuration":"config-name" 
+  "configuration":"config-name",
+
+  /**
+   * this is the default view to show. unless a named view is specified. form submission returns to this view
+   * for testing point directly to any view.
+   */
+  "mainView":"main",
+
+  "views":{
+      /**
+       * Terms of use. first page shown to user
+       */
+      "terms":[], 
+
+      /**
+       * Tutorial. second page shown to user. this is only shown on first use
+       */
+      "tutorial":[],
+
+      /**
+       * 
+       */
+
+      "main":[]
+
+      /**
+       * named views/forms etc.
+       */
+      ...
+  }
 
 
 }

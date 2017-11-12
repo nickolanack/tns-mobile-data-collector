@@ -5,13 +5,69 @@
 function CoreAppClient(config) {
 	var me = this;
 	me.config = config;
-	//events.EventEmitter.call(me);
+
+
+
+
+
+
 
 };
 
-// var request = require("request").defaults({
-// 	jar: true
-// })
+
+CoreAppClient.NativeScriptClient=function(domain){
+
+	return new CoreAppClient({
+		"url":domain,
+		"request":function(options, data, callback) {
+
+	        var form = Object.keys(data).map(function(k) {
+	            return k + "=" + encodeURI(data[k]);
+	        }).join('&');
+	        var http = require('http');
+
+	        var url = 'https://' + options.host + options.path
+
+	        console.log(url + ' form: ' + form);
+
+
+	        var timeout=setTimeout(function() {
+
+	            console.log('Request timed out '+JSON.stringify(options));
+	            timeout=null;
+	            callback('Request timed out');
+
+	        }, 10000);
+
+	        http.request({
+	            url: url,
+	            method: "POST",
+	            headers: {
+	                "Content-Type": "application/x-www-form-urlencoded"
+	            },
+	            timeout:20000,
+	            content: form
+	        }).then(function(response) {
+
+	            if(!timeout){
+	                console.log('already timed out');
+	                return;
+	            }
+	            clearTimeout(timeout);
+	            timeout=null;
+	            callback(null, response, response.content);
+
+	        }, callback).catch(function(e){
+	            console.log('Request Failed: '+e);
+	            callback(e);
+	        });
+	    },
+
+	   "promise":function(executer) {
+	        return new Promise(executer);
+	    }
+	});
+}
 
 
 
@@ -43,7 +99,6 @@ var request = function(options, data, callback) {
 
 var promise=function(callback){
 
-	var Promise = require("promise");
 	return new Promise(callback);
 
 }
