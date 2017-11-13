@@ -25,6 +25,7 @@ function DataAcquisitionApplication(client, params) {
     var Template = require('../').Template;
     template = new Template();
 
+
     bghttp= require("nativescript-background-http");
 
    
@@ -160,7 +161,7 @@ DataAcquisitionApplication.prototype._renderTemplate=function(str, data, templat
     }
 
 
-    return template.render(str, data, template);
+    return me._template.render(str, data, template);
 
 }
 
@@ -191,7 +192,7 @@ DataAcquisitionApplication.prototype._sumbitFeature = function(data, callback) {
 
                 value = parts[1];
                 console.log('Check replacements for ' + key + ' => ' + value);
-                value = instance._renderTemplate(value, data);
+                value = me._renderTemplate(value, data);
             }
 
 
@@ -201,21 +202,28 @@ DataAcquisitionApplication.prototype._sumbitFeature = function(data, callback) {
         attributes[table] = values;
 
     });
-    console.log(JSON.stringify(attributes, null, '   '));
+     
+     var marker={
+            name: me._renderTemplate(options.marker.name || "Add Name!", data),
+            description: me._renderTemplate(options.marker.description, data),
+            coordinates: data.coordinates||data.location,
+            style: "DEFAULT"
+        };
+
+    console.log("Marker: "+JSON.stringify(marker, null, '   ')+" => layer:"+options.layer);
 
     global.client.createMarker(
-        options.layer, {
-            name: data.type || "Add Name!",
-            description: data.description,
-            coordinates: data.coordinates,
-            style: "DEFAULT"
-        }, attributes
+        options.layer, marker, attributes
     ).then(function(result) {
+
         console.log('Created Marker');
         callback();
+
     }).catch(function(err) {
+
         console.log(err);
         callback(err);
+
     });
 
 
@@ -391,7 +399,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 
     }).catch(function(err) {
-        console.log('Form Error => ' + err.message);
+        console.log('Form Error => ' + err);
         callback(err);
     });
 

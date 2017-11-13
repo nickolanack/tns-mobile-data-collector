@@ -250,7 +250,15 @@ ViewRenderer.prototype.renderLocation = function(container, field, model) {
 
 }
 
+var extend=function(a,b){
 
+	b=b||{};
+	Object.keys(b).forEach(function(k){
+		a[k]=b[k];
+	});
+
+	return a;
+}
 
 ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 
@@ -260,99 +268,201 @@ ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 	wrapLayout.className = "media-selection";
 	container.addChild(wrapLayout);
 
-	me._app().requireAccessToCamera().then(function(camera) {
+	var mediaOptions=extend({
+
+		showImage:true,
+		showVideo:false,
+		showAudio:false,
+
+		labelForImage:"Add Image",
+		labelForVideo:"Add Video",
+		labelForAudio:"Add Audio"
 
 
-		var imageAssets = [];
-		model.set(field.name, imageAssets);
 
-		var addPhoto = function() {
+	}, field);
 
 
+	if(mediaOptions.showImage||mediaOptions.showVideo){
 
-			camera.takePicture({
-					width: 500,
-					height: 500,
-					keepAspectRatio: true,
-					saveToGallery: true
-				})
-				.then(function(imageAsset) {
-					var image = new imageModule.Image();
-					image.src = imageAsset;
-					global.storeImageSource(imageAsset).then(function(filename) {
 
-						//Note: I was recieving an out of memory error until I set imageAsset to null
-						imageAsset = null;
 
-						imageAssets.push(filename);
-						model.set(field.name, imageAssets);
-						console.log('Took picture');
+		me._app().requireAccessToCamera().then(function(camera) {
+
+
+			var imageAssets = [];
+			model.set(field.name, imageAssets);
+
+			var addPhoto = function() {
+
+
+
+				camera.takePicture({
+						width: 500,
+						height: 500,
+						keepAspectRatio: true,
+						saveToGallery: true
+					})
+					.then(function(imageAsset) {
+						var image = new imageModule.Image();
+						image.src = imageAsset;
+						global.storeImageSource(imageAsset).then(function(filename) {
+
+							//Note: I was recieving an out of memory error until I set imageAsset to null
+							imageAsset = null;
+
+							imageAssets.push(filename);
+							model.set(field.name, imageAssets);
+							console.log('Took picture');
+
+						}).catch(function(err) {
+							console.log("Error -> " + err.message);
+						});
+						wrapLayout.addChild(image);
+
 
 					}).catch(function(err) {
 						console.log("Error -> " + err.message);
 					});
-					wrapLayout.addChild(image);
-
-
-				}).catch(function(err) {
-					console.log("Error -> " + err.message);
-				});
-		}
-
-
-		var addVideo = function() {
-
-			console.log("add video");
-
-			var videorecorder = new video.VideoRecorder();
-			var options = {
-
-				explanation: "Why do i need this permission" //optional on api 23 #android
 			}
 
-			videorecorder.record(options)
-				.then((data) => {
-					console.log(data.file)
-				})
-				.catch((err) => {
-					console.log(err)
-				})
 
-		}
+			var addVideo = function() {
 
-		if (field.required) {
-			if (imageAssets.length == 0) {
-				setTimeout(function() {
-					addPhoto();
-				}, 1000);
+				console.log("add video");
 
-			}
-		}
+				var videorecorder = new video.VideoRecorder();
+				var options = {
 
-		var buttons = [{
-			label: 'Add photo',
-			className: "add-photo",
-			onTap: function() {
-				addPhoto();
-			}
-		}];
-		if (field.showVideo !== false) {
-			buttons.push({
-				label: 'Add video',
-				className: "add-video",
-				onTap: function() {
-					addVideo();
+					explanation: "Why do i need this permission" //optional on api 23 #android
 				}
-			})
-		}
 
-		renderButtons(wrapLayout, buttons);
+				videorecorder.record(options)
+					.then((data) => {
+						console.log(data.file)
+					})
+					.catch((err) => {
+						console.log(err)
+					})
+
+			}
+
+			if (field.required) {
+				if (imageAssets.length == 0) {
+					setTimeout(function() {
+						addPhoto();
+					}, 1000);
+
+				}
+			}
+
+			var buttons = []
+
+			if (mediaOptions.showImage) {
+				buttons.push({
+					label: mediaOptions.labelForImage,
+					className: "add-photo",
+					onTap: function() {
+						addPhoto();
+					}
+				});
+			}
+
+			if (mediaOptions.showVideo) {
+				buttons.push({
+					label: mediaOptions.labelForVideo,
+					className: "add-video",
+					onTap: function() {
+						addVideo();
+					}
+				})
+			}
+
+			renderButtons(wrapLayout, buttons);
 
 
 
+		});
+
+	}
+
+
+	if(mediaOptions.showAudio){
+
+
+
+		var buttons=[];
+				buttons.push({
+					label: mediaOptions.labelForAudio,
+					className: "add-video",
+					onTap: function() {
+						
+						me._showSubform({
+							"className": "submit",
+							
+							"name":"audio-picker",
+							
+							"fields": [{
+								"type": "style",
+								"stylename": "app-style"
+							},{
+								"type":"audiorecorder"
+							}]
+						})
+
+
+					}
+				})
+	
+
+			renderButtons(wrapLayout, buttons);
+
+	}
+
+	
+
+
+
+}
+
+
+ViewRenderer.prototype.renderAudioRecorder = function(container, field, model) {
+
+	var me=this;
+	
+	renderLabel(container, {
+		value: "Audio Recorder"
 	});
 
 
+
+
+	var TNSRecorder=require("nativescript-audio").TNSRecorder;
+	me._recorder = new (TNSRecorder)();
+	//var permissions = require('nativescript-permissions');
+
+	var button=renderButtons(container,[{
+		label: "Record",
+		className: "record-audio",
+		onTap: function() {
+			if(button.text=="Record"){
+				button.text="Stop";
+
+
+				if(TNSRecorder.CAN_RECORD()){
+					console.log('Ready to record')
+				}else{
+					console.log('Not Ready')
+				}
+
+
+
+			}else{
+				button.text="Record";
+			}
+			
+		}
+	}])[0]
 
 }
 
@@ -627,14 +737,13 @@ var renderButtonset = function(container, field, model, page) {
 
 			if (button.action == 'form') {
 
+
+
 				setTimeout(function() {
 					var topmost = frameModule.topmost();
-					//global.pushSubform(button.form);
 					topmost.navigate({
 						moduleName: "views/form/form",
-						context: {
-							form: button.form
-						}
+						context: JSON.parse(JSON.stringify(button))
 					});
 				}, 500);
 
@@ -647,7 +756,9 @@ var renderButtonset = function(container, field, model, page) {
 			} else if (button.action != 'none') {
 
 				var topmost = frameModule.topmost();
-				//global.pushSubform(button.form);
+				
+				console.log('Attempting to navigate to custom view: views/' + button.action + '/' + button.action);
+
 				topmost.navigate({
 					moduleName: "views/" + button.action + "/" + button.action
 				});
@@ -762,6 +873,22 @@ var renderProgressBar = function(container, field, model) {
 
 }
 
+ViewRenderer.prototype._pushSubform=function(name, callback){
+
+	var me=this;
+	if(!me._models){
+		me._models=[];
+	}
+	me._models.push(me._model);
+
+	global.pushSubform(name, callback);
+};
+ViewRenderer.prototype._popSubform=function(name, callback){
+	var me=this;
+	me._model=me._models.pop();
+	global.popSubform();
+};
+
 
 
 ViewRenderer.prototype.renderForm = function(container, field, model) {
@@ -781,7 +908,7 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 	if (field.persist === true) {
 
 
-		getConfiguration().getLocalData(field.name, {}).then(function(data) {
+		getConfiguration().getLocalData(field.name, field.value||{}).then(function(data) {
 
 			model.set(field.name, data);
 
@@ -792,36 +919,57 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 
 	button.className = "subform";
 	button.on(buttonModule.Button.tapEvent, function(args) {
+		me._showSubform(field);
+	});
 
-		var callback = null;
+
+
+}
+
+ViewRenderer.prototype._showSubform = function(field, callback) {
+
+	var me=this;
+	
 		if (field.persist === true) {
+			var chain=callback;
 			callback = function(data) {
 				console.log('Returned From Subform: ' + JSON.stringify(data))
 				getConfiguration().setLocalData(field.name, data).then(function() {
 					console.log('wrote local: ' + field.name);
-				})
+					chain(data);
+				}).catch(function(e){
+					console.log('Failed to store local dataset: '+field.name+': '+e );
+				});
+
+
 			};
 
 
 		}
 
-		global.pushSubform(field.name, callback);
+		me._pushSubform(field.name, callback);
+
+
+		var contextOptions=JSON.parse(JSON.stringify(field));
+		if(field.name){
+			contextOptions.form=contextOptions.form||field.name;
+		}
 
 		if (field.persist === true) {
 
-			//save form data locally and auto fill.
+			
 
 			getConfiguration().getLocalData(field.name, {}).then(function(data) {
-				global.setFormData(data);
+				global.setFormData(me.getCurrentFormData());
+
+
 
 				var topmost = frameModule.topmost();
 				topmost.navigate({
 					moduleName: "views/form/form",
 					//clearHistory: true,
 					backstackVisible: false,
-					context: {
-						form: field.name
-					}
+					context: contextOptions
 				});
 
 
@@ -838,15 +986,10 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 			moduleName: "views/form/form",
 			//clearHistory: true,
 			backstackVisible: false,
-			context: {
-				form: field.name
-			}
+			context: contextOptions
 		});
-	});
-
-
-
 }
+
 
 
 ViewRenderer.prototype.renderButton = function(container, field, model) {
@@ -897,8 +1040,22 @@ ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 
 	if (action == 'submit') {
 		button.on(buttonModule.Button.tapEvent, function() {
-			global.setFormData(model);
+
+
+			global.setFormData(me.getCurrentFormData());
+
+			var n=field.back||0;
+			while(n>0){
+				me._popSubform();
+				global.setFormData(me.getCurrentFormData());
+				n--;
+			}
+
+
+			
 			global.submitForm();
+
+
 		});
 		return
 	}
@@ -906,10 +1063,17 @@ ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 	if (action == 'back') {
 		button.on(buttonModule.Button.tapEvent, function() {
 			var topmost = frameModule.topmost();
-			global.setFormData(model);
-			global.popSubform();
+			global.setFormData(me.getCurrentFormData());
+			me._popSubform();
 			console.log('Back: ' + JSON.stringify(model));
-			topmost.goBack();
+
+			var n=field.back||1;
+			while(n>0){
+				topmost.goBack();
+				topmost = frameModule.topmost();
+				n--;
+			}
+			
 		});
 		return
 	}
@@ -926,12 +1090,10 @@ ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 	if (action == 'form') {
 		button.on(buttonModule.Button.tapEvent, function() {
 			var topmost = frameModule.topmost();
-			//global.pushSubform(button.form);
 			topmost.navigate({
 				moduleName: "views/form/form",
-				context: {
-					form: field.form
-				}
+				context: JSON.parse(JSON.stringify(field))
+				
 			});
 		});
 		return
@@ -1002,6 +1164,13 @@ ViewRenderer.prototype.renderField = function(container, field, model, page) {
 
 	if (field.type == 'media') {
 		me.renderMediaPicker(container, field, model);
+		return;
+	}
+
+
+	if (field.type == 'audiorecorder') {
+
+		me.renderAudioRecorder(container, field, model);
 		return;
 	}
 
@@ -1133,7 +1302,7 @@ ViewRenderer.prototype.renderView = function(page, model) {
 
 
 	model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
-        console.log('on '+data.propertyName+' changed: '+ data.value);
+        console.log('on '+data.propertyName+' changed: '+ JSON.stringify(data.value));
         //console.log('Property Changed '+JSON.stringify(data));
         //console.log('Properties '+JSON.stringify(page.bindingContext));
     });
@@ -1143,6 +1312,7 @@ ViewRenderer.prototype.renderView = function(page, model) {
 
 
 	var context = page.navigationContext;
+	console.log('Rendering view with context: '+JSON.stringify(context, null, "   "));
 	var container = page.getViewById("container");
 
 	var formName = "main";
@@ -1157,17 +1327,31 @@ ViewRenderer.prototype.renderView = function(page, model) {
 		}
 	}
 
+
 	me._viewName = formName;
 
 
-	var forms = global.parameters.views;
+	
 	container.className = "form-" + formName;
 
-	if (typeof forms == 'string' && forms[0] == "{") {
-		forms = decodeVariable(forms);
-	}
 
-	var elements = forms[formName];
+
+
+	var elements=[];
+
+	if(context.fields){
+ 		elements = context.fields
+	}else{
+
+		//backward compatibility for bcwf. parameters.forms!
+		var forms = global.parameters.views||global.parameters.forms;
+
+		if (typeof forms == 'string' && forms[0] == "{") {
+			forms = decodeVariable(forms);
+		}
+
+		elements = forms[formName];
+	}
 
 
 	if (typeof elements == 'string' && elements[0] == "{") {

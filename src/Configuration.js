@@ -31,7 +31,7 @@ var imagePath = function(name) {
 		throw 'Invalid imagePath name: '+(typeof name)+" "+JSON.stringify(name);
 	}
 
-	name=name.split('/').join('.');
+	name=name.split('/').join('.');//.split('[').join('_').split(']').join('_');
 
 	var folder = fs.knownFolders.temp();
 	var path = fs.path.join(folder.path, name + ".png");
@@ -428,8 +428,11 @@ Configuration.prototype.getIcon = function(name, urlPath) {
 			throw "Empty url";
 		}
 
+		var url = me._formatUrl(urlPath) + "?thumb=128x128";
+		if(url.indexOf('http')!==0){
+			url="https://" + me.client.getUrl() + '/' + url;
+		}
 
-		var url = "https://" + me.client.getUrl() + '/' + urlPath + "?thumb=128x128";
 		// Try to read the image from the cache
 
 		console.log('Requesting icon: ' + url);
@@ -495,10 +498,13 @@ Configuration.prototype.getImage = function(name, urlPath) {
 		}
 
 
-		var url = "https://" + me.client.getUrl() + '/' + urlPath;
+		var url = me._formatUrl(urlPath);
+		if(url.indexOf('http')!==0){
+			url="https://" + me.client.getUrl() + '/' + url;
+		}
 		// Try to read the image from the cache
 
-		console.log('Requesting image url: ' + url);
+		console.log('Requesting image:'+name+' url: ' + url);
 		ImageSource.fromUrl(url).then(function(imgSource) {
 
 			//console.log('Retrieved image: '+JSON.stringify(imgSource));
@@ -508,7 +514,7 @@ Configuration.prototype.getImage = function(name, urlPath) {
 
 		}).catch(function(error) {
 
-			console.log(error);
+			console.log("ImageSource.fromUrl Error: "+url+": "+error);
 
 			if (hasImage(name)) {
 				console.log('Failed to load image: ' + name + ' but found local copy');
@@ -524,6 +530,13 @@ Configuration.prototype.getImage = function(name, urlPath) {
 	});
 
 };
+
+Configuration.prototype._formatUrl=function(url){
+
+	return url;  //url.split('[').join('%5B').split(']').join('%5D');
+
+//://bcwf.geolive.ca/components/com_geolive/users_files/user_files_400/Uploads/%5BG%5D_eXv_N4u_%5BImAgE%5D_4on.png?thumb=48x48
+}
 
 
 Configuration.prototype.getStyle = function(name, urlPath) {
@@ -559,9 +572,9 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 		}
 
 
-		var url =urlPath;
-		if(url.indexOf('https://')!==0){
-			 url="https://" + me.client.getUrl() + '/' + urlPath;
+		var url =me._formatUrl(urlPath);
+		if(url.indexOf('http')!==0){
+			 url="https://" + me.client.getUrl() + '/' + url;
 		}
 		// Try to read the stylesheet from the cache
 		console.log("stylesheet: " + url);
