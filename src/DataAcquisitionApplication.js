@@ -349,16 +349,24 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
     var file = fs.File.fromPath(filepath);
 
 
+    var mediaFields=['media', 'media-audio', 'media-video', 'media-image']
+
     file.readText().then(function(content) {
 
 
         var data = JSON.parse(content);
 
         console.log('Read: ' + content)
-        if (!data.media) {
-            data.media = [];
-        }
-        var mediaItems = mediaItemsThatNeedUploading(data.media);
+
+        var media=[];
+        mediaFields.forEach(function(field){
+            if(data[field]){
+                media=media.concat(data[field]);
+            }
+        })
+
+       
+        var mediaItems = mediaItemsThatNeedUploading(media);
         if (mediaItems.length) {
             if (!countItems) {
                 countItems = mediaItems.length;
@@ -367,7 +375,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
             uploadMediaItem(mediaItems[0], countItems - mediaItems.length, countItems).then(function() {
                 //recursive call will upload all mediaItems until done...
-                console.log(mediaItemsThatNeedUploading(data.media).length + " items to upload");
+                console.log(mediaItemsThatNeedUploading(media).length + " items to upload");
                 me._processFormFilePath(filepath, countItems, callback);
 
 
@@ -383,8 +391,8 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
         console.log('About to save marker');
         console.log(JSON.stringify(data));
-        data.description = (data.description ? data.description : "") + data.media.map(function(media) {
-            return mediaData(media).html;
+        data.description = (data.description ? data.description : "") + media.map(function(item) {
+            return mediaData(item).html;
         }).join("");
         instance._sumbitFeature(data, function(err) {
 
@@ -412,7 +420,8 @@ var mediaItemsThatNeedUploading = function(fileArray) {
     });
 }
 var mediaData = function(filename) {
-    var fileMetaName = filename + '.json'
+    var fileMetaName = filename + '.json';
+    fileMetaName=fileMetaName.split('/').pop()
     var file = fs.File.fromPath(fs.path.join(fs.knownFolders.documents().path, fileMetaName));
 
     // Writing text to the file.
@@ -445,7 +454,11 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
     var me=this;
 
     var savepath = fs.knownFolders.documents().path;
-    var filePath = fs.path.join(savepath, filename);
+    var filePath = filename[0]=='/'?filename:fs.path.join(savepath, filename);
+
+    filename=filename.split('/').pop();
+
+
     var file = fs.File.fromPath(filePath);
 
     if (!fs.File.exists(filePath)) {
@@ -453,16 +466,31 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
     }
 
 
-    var url = 'https://' + global.client.getUrl()+ "/" + global.client.getPathForTask("image_upload") + "&json=%7B%7D"; 
+    var type="image_upload";
+
+    if(filename.indexOf(".mp3")>0||filename.indexOf(".m4a")>0){
+        type="audio_upload";
+    }
+
+    if(filename.indexOf(".mp4")>0){
+        type="video_upload";
+    }
+
+
+    var url = 'https://' + global.client.getUrl()+ "/" + global.client.getPathForTask(type) + "&json=%7B%7D"; 
     var method = "POST";
 
     console.log('Initiating Background Upload: ' + filename);
     console.log('Post Background ' + method + ': ' + url);
     console.log('File Exists! ' + filename + " " + file.extension + " " + file.lastModified);
 
-
+    if( type=="video_upload"){
+       file.readText().then(function(text){
+        console.log("Video: "+text);
+       })
+    }
     
-    var session = bghttp.session("image-upload");
+    var session = bghttp.session("media-upload");
 
     var request = {
         url: url,
@@ -471,21 +499,16 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
             "Content-Type": "application/octet-stream",
             "File-Name": filename
         },
-        description: "{ 'uploading': somefile.png }"
+        description: "{ 'uploading': "+filename+" }"
     };
-
 
 
     console.log('Generating Promise');
 
-   
+    console.log("about to upload: "+filePath);
     var task = session.uploadFile(filePath, request);
 
     return new Promise(function(resolve, reject) {
-
-
-        
-       
 
 
         console.log('Executing Promise');
@@ -509,12 +532,12 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
 
         task.on("responded", function(response) {
 
-            console.log('Response: ' + response.data);
+            console.log('Response: ' + response.data+" "+url);
             var fileMeta = JSON.parse(response.data);
 
 
 
-            var fileMetaName = filename + '.json'
+            var fileMetaName = filename + '.json';
             var file = fs.File.fromPath(fs.path.join(fs.knownFolders.documents().path, fileMetaName));
 
             // Writing text to the file.
@@ -534,6 +557,8 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
 
 var hasUrlForMedia = function(filename) {
 
+
+    filename=filename.split('/').pop();
 
     var documents = fs.knownFolders.documents();
     var filePath = fs.path.join(documents.path, filename) + '.json';

@@ -107,97 +107,170 @@ var decodeVariable = function(str, template) {
 }
 
 
-ViewRenderer.prototype._parse = function(str, template) {
+ViewRenderer.prototype._parse = function(str, template, params) {
 
 
-	var me=this;
-	
-	if(!me._template){
+	var me = this;
+
+	if (!me._template) {
 		var Template = require('../').Template;
-		me._template=new Template();
+		me._template = new Template();
 	}
 
-	var params=JSON.parse(JSON.stringify(me._config().getDefaultParameters()));
-	params.data=JSON.parse(JSON.stringify(me.getCurrentFormData()));
+	if(!params){
+		params = me._params();
+	}
+	
 
 
 	return me._template.render(str, params, template);
 
 }
 
-ViewRenderer.prototype._bind = function(str, callback) {
+ViewRenderer.prototype._params = function(model) {
 
 	var me=this;
+
+	var params = JSON.parse(JSON.stringify(me._config().getDefaultParameters()));
+	params.data = JSON.parse(JSON.stringify(me.getCurrentFormData(model)));
+	return params;
+
+}
+
+
+
+ViewRenderer.prototype._bind = function(str, callback) {
+
+	var me = this;
 	callback(decodeVariable(str));
-	if(me._shouldBindToData(str)){
+	if (me._shouldBindToData(str)) {
 		me._bindToDataChangeEvents(str, callback);
 	}
 
 }
 
 ViewRenderer.prototype._shouldBindToData = function(str) {
-	if(str.indexOf('{data.')>=0){
+	if (str.indexOf('{data.') >= 0) {
 		return true;
 	}
 }
 
 
 ViewRenderer.prototype._bindToDataChangeEvents = function(str, callback) {
-	var me=this;
-	me._model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
-		callback(decodeVariable(str));
-    });
+	var me = this;
+	
+	var model=me._model; 
+
+	model.on(require("data/observable").Observable.propertyChangeEvent, function(data) {
+		callback(me._parse(str, null, me._params(model)));
+	});
 }
 
 
 ViewRenderer.prototype._addDataChangeEvents = function(str, callback) {
-	var me=this;
-	me._model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
+	var me = this;
+	me._model.on(require("data/observable").Observable.propertyChangeEvent, function(data) {
 		callback(decodeVariable(str));
-    });
+	});
 }
 
 
+
+ViewRenderer.prototype._addStyle = function(el, field) {
+	if(el&&field&&field.style){
+		el.style=field.style;
+	}
+
+
+}
+
+ViewRenderer.prototype._addClass = function(el, className) {
+	if(el&&className&&className!==""){
+
+		if(typeof className !="string"){
+			if(!className.className){
+				return;
+			}
+			className=className.className;
+		}
+
+		var classNames=(el.className?el.className:"").split(' ');
+		if(classNames.indexOf(className)==-1){
+			classNames.push(className)
+			el.className=classNames.join(' ');
+		}
+	}
+
+
+}
+
+ViewRenderer.prototype._removeClass = function(el, className) {
+	if(el&&className&&className!==""){
+
+		if(typeof className !="string"){
+			if(!className.className){
+				return;
+			}
+			className=className.className;
+		}
+
+		var classNames=(el.className?el.className:"").split(' ');
+		var index=classNames.indexOf(className)
+		if(index>=0){
+			classNames.splice(index,1);
+			el.className=classNames.join(' ');
+		}
+	}
+
+
+}
 
 
 
 var renderHeading = function(container, field) {
-
-
-
-	var label = new labelModule.Label();
-	instance._bind(field.value, function(value){
-		label.text=value
-	});
-	label.className = "heading";
-	label.textWrap = true;
-	container.addChild(label);
-
-}
-var renderLabel=function(container, field) {
-	return instance.renderLabel(container, field);
+	return instance.renderHeading(container, field);
 }
 
-
-
-
-
-ViewRenderer.prototype.renderLabel = function(container, field) {
+ViewRenderer.prototype.renderHeading = function(container, field) {
 
 	var me=this;
-
-	var label = new labelModule.Label();
-	var value = decodeVariable(field.value);
-
-	instance._bind(field.value, function(value){
-		label.text=value
-	});
-
-	label.className = "label";
-	label.textWrap = true;
-	container.addChild(label);
+	var label=me.renderText(container, field);
+	me._addClass(label, "heading");
+	
+	return label;
 
 }
+
+var renderLabel = function(container, field) {
+	return instance.renderLabel(container, field);
+}
+ViewRenderer.prototype.renderLabel = function(container, field) {
+	
+	var me=this;
+	var label=me.renderText(container, field);
+	me._addClass(label, "label");
+	return label;
+
+}
+ViewRenderer.prototype.renderText = function(container, field) {
+	var me = this;
+
+	var label = new labelModule.Label();
+	instance._bind(field.value, function(value) {
+		label.text = value
+	});
+
+	me._addStyle(label, field);
+	me._addClass(label, field);
+
+	label.textWrap = true;
+
+	container.addChild(label);
+	return label;
+}
+
+
+
 
 var renderHtml = function(container, field) {
 
@@ -250,48 +323,102 @@ ViewRenderer.prototype.renderLocation = function(container, field, model) {
 
 }
 
-var extend=function(a,b){
+var extend = function(a, b) {
 
-	b=b||{};
-	Object.keys(b).forEach(function(k){
-		a[k]=b[k];
+	b = b || {};
+	Object.keys(b).forEach(function(k) {
+		a[k] = b[k];
 	});
 
 	return a;
+}
+
+
+ViewRenderer.prototype.back = function(num) {
+
+	var me = this;
+
+	var topmost = frameModule.topmost();
+	global.setFormData(me.getCurrentFormData());
+	me._popSubform();
+
+
+	var n = num || 1;
+	while (n > 0) {
+		topmost.goBack();
+		topmost = frameModule.topmost();
+		n--;
+	}
+}
+
+
+ViewRenderer.prototype.submit = function(num) {
+
+	var me = this;
+
+	global.setFormData(me.getCurrentFormData());
+
+	var n = num || 0;
+	while (n > 0) {
+		me._popSubform();
+		global.setFormData(me.getCurrentFormData());
+		n--;
+	}
+
+
+	global.submitForm();
+}
+
+ViewRenderer.prototype.cancel = function() {
+
+	var me = this;
+
+	var topmost = frameModule.topmost();
+	//global.setFormData(me.getCurrentFormData());
+	me._popSubform();
+	console.log('Cancel');
+
+
+	topmost.goBack();
 }
 
 ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 
 	var me = this;
 
-	var wrapLayout = new wrapLayoutModule.WrapLayout();
-	wrapLayout.className = "media-selection";
-	container.addChild(wrapLayout);
+	var mediaSelection = new wrapLayoutModule.WrapLayout();
 
-	var mediaOptions=extend({
+	me._addClass(mediaSelection,  "media-selection")
+	container.addChild(mediaSelection);
 
-		showImage:true,
-		showVideo:false,
-		showAudio:false,
+	var mediaOptions = extend({
 
-		labelForImage:"Add Image",
-		labelForVideo:"Add Video",
-		labelForAudio:"Add Audio"
+		showImage: true,
+		showVideo: false,
+		showAudio: false,
+
+		labelForImage: "Add Image",
+		labelForVideo: "Add Video",
+		labelForAudio: "Add Audio"
 
 
 
 	}, field);
 
 
-	if(mediaOptions.showImage||mediaOptions.showVideo){
+
+	var imageAssets = [];
+	model.set(field.name, imageAssets);
+
+	if (mediaOptions.showImage || mediaOptions.showVideo) {
 
 
 
 		me._app().requireAccessToCamera().then(function(camera) {
 
 
-			var imageAssets = [];
-			model.set(field.name, imageAssets);
+			
+			
 
 			var addPhoto = function() {
 
@@ -315,10 +442,11 @@ ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 							model.set(field.name, imageAssets);
 							console.log('Took picture');
 
+
 						}).catch(function(err) {
 							console.log("Error -> " + err.message);
 						});
-						wrapLayout.addChild(image);
+						mediaSelection.addChild(image);
 
 
 					}).catch(function(err) {
@@ -330,19 +458,34 @@ ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 			var addVideo = function() {
 
 				console.log("add video");
-
 				var videorecorder = new video.VideoRecorder();
 				var options = {
-
+					//saveToGallery:true,
+					duration:60, //(seconds) default no limit | optional
+					format:'mp4', //allows videos to be played on android devices | optional | recommended for cross platform apps
+					size:10, //(MB) default none | optional #android
+					hd:true, //default false low res | optional
+					format:'mp4',
 					explanation: "Why do i need this permission" //optional on api 23 #android
 				}
 
 				videorecorder.record(options)
 					.then((data) => {
 						console.log(data.file)
+
+						imageAssets.push(data.file);
+						model.set(field.name, imageAssets);
+
+						getConfiguration().getImage('video-icon').then(function(imgPath){
+							var image = new imageModule.Image();
+							image.src = imgPath;
+							mediaSelection.addChild(image)
+						})
+
+
 					})
 					.catch((err) => {
-						console.log(err)
+						console.log('Video Error:'+err)
 					})
 
 			}
@@ -378,7 +521,7 @@ ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 				})
 			}
 
-			renderButtons(wrapLayout, buttons);
+			renderButtons(mediaSelection, buttons);
 
 
 
@@ -387,82 +530,190 @@ ViewRenderer.prototype.renderMediaPicker = function(container, field, model) {
 	}
 
 
-	if(mediaOptions.showAudio){
+	if (mediaOptions.showAudio) {
 
 
 
-		var buttons=[];
-				buttons.push({
-					label: mediaOptions.labelForAudio,
-					className: "add-video",
-					onTap: function() {
-						
-						me._showSubform({
-							"className": "submit",
-							
-							"name":"audio-picker",
-							
-							"fields": [{
-								"type": "style",
-								"stylename": "app-style"
-							},{
-								"type":"audiorecorder"
-							}]
-						})
+		var buttons = [];
+		buttons.push({
+			label: mediaOptions.labelForAudio,
+			className: "add-video",
+			onTap: function() {
+
+				me._showSubform({
+					"className": "submit",
+
+					"name": "audio-picker",
+
+					"fields": [
+						// {
+						// 	"type": "style",
+						// 	"stylename": "app-style"
+						// },
+						{
+							"type": "audiorecorder"
+						}, {
+							"type": "label",
+							"value":"Duration: {data.seconds}s"
+						},{
+							"type": "label",
+							"value":"File: {data.filename}"
+						},{
+							"className": "cancel",
+							"type": "button",
+							"position": "bottom-left",
+							"label": "Cancel",
+							"action": function(data) {
+								me.cancel();
+							}
+						}, {
+							"className": "",
+							"position": "bottom-right",
+							"type": "button",
+							"label": "Save",
+							"action": function(data) {
+
+								me.back();
+								model.set("audio-picker", data);
+								console.log("audiorecorder data: "+JSON.stringify(data, null, "   "));
+								console.log("Main data: "+JSON.stringify(me.getCurrentFormData(), null, "   "));
 
 
-					}
+								imageAssets.push(data.filename);
+								model.set(field.name, imageAssets);
+
+								getConfiguration().getImage('audio-icon').then(function(imgPath){
+									var image = new imageModule.Image();
+									image.src = imgPath;
+									mediaSelection.addChild(image)
+								})
+								
+								
+
+
+							}
+
+						}
+					]
 				})
-	
 
-			renderButtons(wrapLayout, buttons);
+
+			}
+		})
+
+
+		renderButtons(mediaSelection, buttons);
 
 	}
-
-	
 
 
 
 }
 
 
+
+
 ViewRenderer.prototype.renderAudioRecorder = function(container, field, model) {
 
-	var me=this;
-	
+	var me = this;
+
 	renderLabel(container, {
 		value: "Audio Recorder"
 	});
 
+	var application = require("application");
+	var filename = new Date().getTime() + (application.android?'.mp3':'.m4a');
 
 
 
-	var TNSRecorder=require("nativescript-audio").TNSRecorder;
-	me._recorder = new (TNSRecorder)();
+	var fs = require("file-system");
+	var savepath = fs.knownFolders.documents().path;
+	var filepath = fs.path.join(savepath, filename);
+
+
+
+	
+	var recorderOptions={
+		filename: filepath,
+		infoCallback: function() {
+			console.log("callback: " + JSON.stringify(arguments));
+		},
+		errorCallback: function() {
+			console.log(arguments);
+		}
+	};
+	if (application.android) {
+		var permissions = require('nativescript-permissions');
+		permissions.requestPermission(android.Manifest.permission.RECORD_AUDIO, "Let me hear your thoughts...")
+			.then(function() {})
+
+
+			recorderOptions.source=android.media.MediaRecorder.AudioSource.MIC;
+			
+		
+	}
+
+
+	var TNSRecorder = require("nativescript-audio").TNSRecorder;
+	me._recorder = new(TNSRecorder)();
 	//var permissions = require('nativescript-permissions');
 
-	var button=renderButtons(container,[{
+	
+
+	model.set('filename', filename);
+	
+	console.log(filename);
+
+	var interval=null;
+	var secondsx10=0;
+	model.set('seconds', 0.0);
+
+	var button = me.renderButtonsetButton(container, {
 		label: "Record",
-		className: "record-audio",
+		className: "record-audio btn-main",
 		onTap: function() {
-			if(button.text=="Record"){
-				button.text="Stop";
+			if (button.text == "Record") {
+				
+
+				
 
 
-				if(TNSRecorder.CAN_RECORD()){
-					console.log('Ready to record')
-				}else{
+				if (TNSRecorder.CAN_RECORD()) {
+					console.log('Ready to record');
+					me._recorder.start(recorderOptions).then(function(something) {
+
+						button.text = "Stop";
+						console.log('Recording');
+						console.log(something);
+						secondsx10=0;
+						model.set('seconds', 0.0);
+						interval=setInterval(function(){
+							secondsx10+=1;
+							model.set('seconds', Math.round(secondsx10)/10.0);
+						},100);
+
+
+					}).catch(function(e) {
+						console.log("Audio Error " + e);
+					});
+				} else {
+
 					console.log('Not Ready')
 				}
 
 
 
-			}else{
-				button.text="Record";
+			} else {
+				button.text = "Record";
+				me._recorder.stop();
+				model.set('audio', filepath);
+				if(interval){
+					clearInterval(interval);
+				}
 			}
-			
+
 		}
-	}])[0]
+	});
 
 }
 
@@ -474,7 +725,7 @@ var renderTextField = function(container, field, model) {
 
 	textfield.hint = field.placeholder;
 
-	textfield.className = "textfield";
+	instance._addClass(textfield, "textfield")
 	var bindingOptions = {
 		sourceProperty: field.name,
 		targetProperty: "text",
@@ -517,7 +768,9 @@ var renderBoolean = function(container, field, model) {
 	model.set(field.name, !!field.value);
 
 	var stackLayout = new stackLayoutModule.StackLayout();
-	stackLayout.className = "boolean";
+
+	instance._addClass(stackLayout, "boolean");
+
 	container.addChild(stackLayout);
 	stackLayout.orientation = "horizontal";
 	stackLayout.addChild(toggle);
@@ -547,11 +800,9 @@ var renderButtons = function(container, fields, model) {
 		}
 
 
-		if (field.className) {
+	
+		instance._addClass(button, field);
 
-			button.className += " " + field.className;
-
-		}
 
 		stackLayout.addChild(button);
 		buttons.push(button);
@@ -570,20 +821,13 @@ var renderIconselect = function(container, field, model) {
 	var buttons = [];
 	var clearSelected = function() {
 		buttons.forEach(function(b) {
-
-			var c = b.className.split(' ');
-			var i = c.indexOf("selected");
-			if (i >= 0) {
-				c.splice(i, 1);
-			}
-			var className = c.join(' ');
-			console.log(b.className + " -> " + className);
-			b.className = className;
+			instance._removeClass(b, "selected");
 		});
 	}
 
 	var wrapLayout = new wrapLayoutModule.WrapLayout();
-	wrapLayout.className = "iconselect";
+
+	instance._addClass(wrapLayout, "iconselect");
 	container.addChild(wrapLayout);
 
 	decodeVariable(field.icons, field.template).forEach(function(icon) {
@@ -592,8 +836,8 @@ var renderIconselect = function(container, field, model) {
 		wrapLayout.addChild(imageStack);
 
 		var stackLayout = new stackLayoutModule.StackLayout();
-		var className = "icon value-" + (icon.value.toLowerCase());
-		stackLayout.className = className;
+		instance._addClass(stackLayout, "icon value-" + icon.value.toLowerCase());
+
 		imageStack.addChild(stackLayout);
 
 
@@ -619,8 +863,7 @@ var renderIconselect = function(container, field, model) {
 			console.log('set:' + field.name + ' -> ' + icon.icon);
 			model.set(field.name, icon.value);
 			clearSelected();
-			stackLayout.className = "selected " + className
-			console.log('set:' + field.name + ' className -> ' + "selected " + className);
+			instance._addClass(stackLayout, "selected");
 
 		};
 		if (icon.value == field.value) {
@@ -641,72 +884,96 @@ var renderIconselect = function(container, field, model) {
 
 var renderImage = function(container, url, model, page) {
 	var image = new imageModule.Image();
-
 	var src = url;
+	if(url.indexOf('{')){
+
+		 src = decodeVariable(url);
+		 console.log('Variable Image: '+src);
+
+	}
 	if (src[0] !== "~") {
 		src = 'https://' + global.client.getUrl() + "/" + url;
 	}
+
+
 
 	image.src = src;
 	container.addChild(image);
 	return image;
 }
 
-var renderButtonset = function(container, field, model, page) {
+ViewRenderer.prototype.renderButtonset = function(container, field, model, page) {
 
+	var me=this;
 
 	var buttons = [];
-	var clearSelected = function() {
-		buttons.forEach(function(b) {
 
-			var c = b.className.split(' ');
-			var i = c.indexOf("selected");
-			if (i >= 0) {
-				c.splice(i, 1);
-			}
-			var className = c.join(' ');
-			console.log(b.className + " -> " + className);
-			b.className = className;
-		});
-	}
 
 	var wrapLayout = new wrapLayoutModule.WrapLayout();
-	wrapLayout.className = "buttonset";
-	//wrapLayout.horizontalAlignment='center';
-	if (field.className) {
-		wrapLayout.className = "buttonset " + field.className;
-	}
+
+	me._addClass(wrapLayout, "buttonset");
+	me._addClass(wrapLayout, field);
+
+
 	container.addChild(wrapLayout);
 
-
+	
 
 	field.buttons.forEach(function(button) {
 
-		var imageStack = new stackLayoutModule.StackLayout();
-		wrapLayout.addChild(imageStack);
+		var btnEl=me.renderButtonsetButton(wrapLayout, button);
+		buttons.push(btnEl);	
+
+		me.applyTapAction(btnEl,function(){
+			me._setSelected(btnEl, button, buttons);
+		});
+
+	});
+
+
+	//console.log(buttons);
+	return buttons;
+
+}
+
+ViewRenderer.prototype._clearSelected = function(buttons) {
+	var me=this;
+	buttons.forEach(function(b) {
+		me._removeClass(b, "selected");
+	});
+}
+
+ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
+
+	var me=this;
+
+	var imageStack = new stackLayoutModule.StackLayout();
+		container.addChild(imageStack);
 
 		var stackLayout = new stackLayoutModule.StackLayout();
 		stackLayout.className = "icon";
+
+		me._addClass(stackLayout, "icon");
+		me._addClass(stackLayout, field);
+
 		imageStack.addChild(stackLayout);
 
-		if (button.className) {
-			stackLayout.className = "icon " + button.className;
-		}
-
 		var onTapFns = [];
-		if (button.icon) {
+		if (field.icon) {
 
 
 
-			getConfiguration().getImage(button.icon)
+			getConfiguration().getImage(field.icon)
 
-			.then(function(imgPath) {
+				.then(function(imgPath) {
+
+					console.log('Got Buttonset Image path')
 
 					var image = new imageModule.Image();
 					image.src = imgPath;
 					stackLayout.addChild(image);
 					renderLabel(imageStack, {
-						value: button.label
+						value: field.label
 					})
 
 
@@ -719,69 +986,119 @@ var renderButtonset = function(container, field, model, page) {
 					console.log("Field Button Error: " + err);
 					//Still render the label.
 					renderLabel(imageStack, {
-						value: button.label
+						value: field.label
 					})
 				});
 
 		} else {
 
-			//renderButton(stackLayout, button);
+			renderButton(stackLayout, button);
 		}
-
-		stackLayout.on(buttonModule.Button.tapEvent, function(args) {
-
-			console.log('Tap');
-			onTapFns.forEach(function(fn) {
-				fn();
-			})
-
-			if (button.action == 'form') {
+		
+		return stackLayout;
 
 
-
-				setTimeout(function() {
-					var topmost = frameModule.topmost();
-					topmost.navigate({
-						moduleName: "views/form/form",
-						context: JSON.parse(JSON.stringify(button))
-					});
-				}, 500);
-
-				return;
-			} else if (button.action == 'link') {
-
-				utilityModule.openUrl(button.link);
-				return;
-
-			} else if (button.action != 'none') {
-
-				var topmost = frameModule.topmost();
-				
-				console.log('Attempting to navigate to custom view: views/' + button.action + '/' + button.action);
-
-				topmost.navigate({
-					moduleName: "views/" + button.action + "/" + button.action
-				});
-				return;
-			}
-
-
-			if (field.name && button.value) {
-				console.log('set:' + field.name + ' -> ' + button.value);
-				model.set(field.name, button.value);
-				clearSelected();
-				stackLayout.className = "selected icon"
-			}
-
-
-		});
-		buttons.push(stackLayout);
-
-	});
-	//console.log(buttons);
-	return buttons;
 
 }
+ViewRenderer.prototype.renderButton = function(container, field, model) {
+
+	var me = this;
+
+
+
+	var button = new buttonModule.Button();
+	//button.text = field.label;
+
+	me._bind(field.label, function(value) {
+		button.text = value
+	});
+
+
+	var stackLayout = new stackLayoutModule.StackLayout();
+	stackLayout.orientation = "horizontal";
+
+	if (field.image) {
+		var image = renderImage(stackLayout, field.image);
+		me._addClass(image, "button-image");
+	}
+
+	container.addChild(stackLayout);
+
+	stackLayout.addChild(button);
+
+	if (field.action) {
+
+		console.log('Apply Tap');
+		me.applyTapAction(stackLayout, field, model);
+		me.applyTapAction(button, field, model);
+
+	} else {
+
+		console.log("There is no tap acction for field: " + JSON.stringify(field, null, "   "));
+	
+	}
+
+	me._addClass(button, field);
+
+
+	return button;
+}
+
+
+
+ViewRenderer.prototype._setSelected = function(button, field, buttons) {
+
+	var me=this;
+
+	if(buttons){
+		me._clearSelected(buttons);
+	}	
+
+
+	console.log('Tap');
+	// onTapFns.forEach(function(fn) {
+	// 	fn();
+	// })
+
+	if (field.action == 'form') {
+
+
+
+		setTimeout(function() {
+			var topmost = frameModule.topmost();
+			topmost.navigate({
+				moduleName: "views/form/form",
+				context: JSON.parse(JSON.stringify(field))
+			});
+		}, 500);
+
+		return;
+	} else if (field.action == 'link') {
+
+		utilityModule.openUrl(field.link);
+		return;
+
+	} else if (field.action != 'none') {
+
+		var topmost = frameModule.topmost();
+
+		console.log('Attempting to navigate to custom view: views/' + field.action + '/' + field.action);
+
+		topmost.navigate({
+			moduleName: "views/" + field.action + "/" + field.action
+		});
+		return;
+	}
+
+
+	if (field.name && field.value) {
+		console.log('set:' + field.name + ' -> ' + field.value);
+		me._model.set(field.name, field.value);
+		me._addClass(button, "selected");
+	}
+
+}
+
 
 var renderSpace = function(container, field) {
 
@@ -825,7 +1142,7 @@ var renderProgressBar = function(container, field, model) {
 
 	var label = new labelModule.Label();
 	label.text = '{progress.label}';
-	label.className = "label";
+	instance._addClass(label, "label");
 
 	var timeout = null;
 
@@ -873,19 +1190,19 @@ var renderProgressBar = function(container, field, model) {
 
 }
 
-ViewRenderer.prototype._pushSubform=function(name, callback){
+ViewRenderer.prototype._pushSubform = function(name, callback) {
 
-	var me=this;
-	if(!me._models){
-		me._models=[];
+	var me = this;
+	if (!me._models) {
+		me._models = [];
 	}
 	me._models.push(me._model);
 
 	global.pushSubform(name, callback);
 };
-ViewRenderer.prototype._popSubform=function(name, callback){
-	var me=this;
-	me._model=me._models.pop();
+ViewRenderer.prototype._popSubform = function(name, callback) {
+	var me = this;
+	me._model = me._models.pop();
 	global.popSubform();
 };
 
@@ -908,7 +1225,7 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 	if (field.persist === true) {
 
 
-		getConfiguration().getLocalData(field.name, field.value||{}).then(function(data) {
+		getConfiguration().getLocalData(field.name, field.value || {}).then(function(data) {
 
 			model.set(field.name, data);
 
@@ -917,7 +1234,7 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 		})
 	}
 
-	button.className = "subform";
+	instance._addClass(button, "subform");
 	button.on(buttonModule.Button.tapEvent, function(args) {
 		me._showSubform(field);
 	});
@@ -928,152 +1245,131 @@ ViewRenderer.prototype.renderForm = function(container, field, model) {
 
 ViewRenderer.prototype._showSubform = function(field, callback) {
 
-	var me=this;
-	
-		if (field.persist === true) {
-			var chain=callback;
-			callback = function(data) {
-				console.log('Returned From Subform: ' + JSON.stringify(data))
-				getConfiguration().setLocalData(field.name, data).then(function() {
-					console.log('wrote local: ' + field.name);
-					chain(data);
-				}).catch(function(e){
-					console.log('Failed to store local dataset: '+field.name+': '+e );
-				});
+	var me = this;
 
-
-			};
-
-
-		}
-
-		me._pushSubform(field.name, callback);
-
-
-		var contextOptions=JSON.parse(JSON.stringify(field));
-		if(field.name){
-			contextOptions.form=contextOptions.form||field.name;
-		}
-
-		if (field.persist === true) {
-
-			
-
-			getConfiguration().getLocalData(field.name, {}).then(function(data) {
-				global.setFormData(me.getCurrentFormData());
-
-
-
-				var topmost = frameModule.topmost();
-				topmost.navigate({
-					moduleName: "views/form/form",
-					//clearHistory: true,
-					backstackVisible: false,
-					context: contextOptions
-				});
-
-
+	if (field.persist === true) {
+		var chain = callback;
+		callback = function(data) {
+			console.log('Returned From Subform: ' + JSON.stringify(data))
+			getConfiguration().setLocalData(field.name, data).then(function() {
+				console.log('wrote local: ' + field.name);
+				chain(data);
 			}).catch(function(e) {
-				console.log('failed to get local data: ' + e);
-			})
+				console.log('Failed to store local dataset: ' + field.name + ': ' + e);
+			});
 
-			return;
 
-		}
+		};
 
-		var topmost = frameModule.topmost();
-		topmost.navigate({
-			moduleName: "views/form/form",
-			//clearHistory: true,
-			backstackVisible: false,
-			context: contextOptions
-		});
+
+	}
+
+	me._pushSubform(field.name, callback);
+
+
+	/**
+	 * Note: I'm carefully allowing field to pass through withough making sure it is completely disconnected from 
+	 * any object references (using json) so that functions are not lost. (audio picker...)
+	 */
+	var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
+	if (field.name) {
+		contextOptions.form = contextOptions.form || field.name;
+
+	}
+
+	if (field.persist === true) {
+
+
+
+		getConfiguration().getLocalData(field.name, {}).then(function(data) {
+			global.setFormData(me.getCurrentFormData());
+
+
+
+			var topmost = frameModule.topmost();
+			topmost.navigate({
+				moduleName: "views/form/form",
+				//clearHistory: true,
+				backstackVisible: false,
+				context: contextOptions
+			});
+
+
+		}).catch(function(e) {
+			console.log('failed to get local data: ' + e);
+		})
+
+		return;
+
+	}
+
+	var topmost = frameModule.topmost();
+	topmost.navigate({
+		moduleName: "views/form/form",
+		//clearHistory: true,
+		backstackVisible: false,
+		context: contextOptions
+	});
 }
 
 
 
-ViewRenderer.prototype.renderButton = function(container, field, model) {
+
+
+
+/**
+ * add Tap event Handler for element. 
+ * action can be a string, or object with key `action`.
+ * if action='event'` then must be {"action":"event", "event":"someEventName"}
+ */
+
+ViewRenderer.prototype.applyTapAction = function(button, action, model) {
+
 
 	var me = this;
+	var field=action;
 
-
-
-	var button = new buttonModule.Button();
-	button.text = field.label;
-
-	var stackLayout = new stackLayoutModule.StackLayout();
-	stackLayout.orientation = "horizontal";
-
-	if (field.image) {
-		var image = renderImage(stackLayout, field.image).className += " button-image";
+	if(action.action){
+		action=action.action
 	}
 
-	container.addChild(stackLayout);
-
-	stackLayout.addChild(button);
-
-	if (field.action) {
-
-		me.applyTapAction(stackLayout, field, model);
-		me.applyTapAction(button, field, model);
-
-	}
-
-	if (field.className) {
-
-		button.className += " " + field.className;
-
-	}
-
-
-	return button;
-}
-
-
-
-ViewRenderer.prototype.applyTapAction = function(button, field, model) {
-
-	var me = this;
-
-	var action = field.action;
 	console.log('Apply button action ' + action);
+
+
+
+
+
+	if (typeof action == "function") {
+		/**
+		 * Not possible if form is defined in json...
+		 */
+
+		console.log("Button With Function!");
+
+		button.on(buttonModule.Button.tapEvent, function() {
+			action(me.getCurrentFormData());
+		});
+
+		return;
+
+	}
+
 
 	if (action == 'submit') {
 		button.on(buttonModule.Button.tapEvent, function() {
 
-
-			global.setFormData(me.getCurrentFormData());
-
-			var n=field.back||0;
-			while(n>0){
-				me._popSubform();
-				global.setFormData(me.getCurrentFormData());
-				n--;
-			}
-
-
-			
-			global.submitForm();
-
+			me.submit(field.back);
 
 		});
+
 		return
 	}
 
 	if (action == 'back') {
 		button.on(buttonModule.Button.tapEvent, function() {
-			var topmost = frameModule.topmost();
-			global.setFormData(me.getCurrentFormData());
-			me._popSubform();
-			console.log('Back: ' + JSON.stringify(model));
 
-			var n=field.back||1;
-			while(n>0){
-				topmost.goBack();
-				topmost = frameModule.topmost();
-				n--;
-			}
-			
+			me.back(field.back);
+
 		});
 		return
 	}
@@ -1093,7 +1389,7 @@ ViewRenderer.prototype.applyTapAction = function(button, field, model) {
 			topmost.navigate({
 				moduleName: "views/form/form",
 				context: JSON.parse(JSON.stringify(field))
-				
+
 			});
 		});
 		return
@@ -1138,7 +1434,7 @@ ViewRenderer.prototype.renderFieldset = function(container, fields, model, page)
 	});
 }
 
-ViewRenderer.prototype.renderField = function(container, field, model, page) {
+ViewRenderer.prototype.renderField = function(defaultParentNode, field, model, page) {
 
 
 	var me = this;
@@ -1147,6 +1443,15 @@ ViewRenderer.prototype.renderField = function(container, field, model, page) {
 	if (!field) {
 		throw 'Requires a field!'
 	}
+
+	var container = defaultParentNode;
+	if (field.position) {
+		var node = page.getViewById(field.position);
+		if (node) {
+			container = node;
+		}
+	}
+
 
 	if (!field.type) {
 		throw 'Field must have a type! ' + JSON.stringify(field, null, "   ")
@@ -1215,7 +1520,7 @@ ViewRenderer.prototype.renderField = function(container, field, model, page) {
 	}
 
 	if (field.type == 'buttonset') {
-		renderButtonset(container, field, model, page);
+		me.renderButtonset(container, field, model, page);
 		return;
 	}
 
@@ -1267,15 +1572,18 @@ ViewRenderer.prototype.hasView = function(formName) {
 }
 
 
-ViewRenderer.prototype.getCurrentFormData = function() {
+ViewRenderer.prototype.getCurrentFormData = function(model) {
 	var me = this;
 
 	var data = {};
-	Object.keys(me._model).forEach(function(k) {
+	if(!model){
+		model=me._model;
+	}
+	Object.keys(model).forEach(function(k) {
 		if (k.indexOf('_') === 0) {
 			return;
 		}
-		data[k] = me._model[k];
+		data[k] = model[k];
 	});
 
 
@@ -1301,18 +1609,18 @@ ViewRenderer.prototype.renderView = function(page, model) {
 	me._page = page;
 
 
-	model.on(require("data/observable").Observable.propertyChangeEvent, function (data) {
-        console.log('on '+data.propertyName+' changed: '+ JSON.stringify(data.value));
-        //console.log('Property Changed '+JSON.stringify(data));
-        //console.log('Properties '+JSON.stringify(page.bindingContext));
-    });
+	model.on(require("data/observable").Observable.propertyChangeEvent, function(data) {
+		console.log('on ' + data.propertyName + ' changed: ' + JSON.stringify(data.value));
+		//console.log('Property Changed '+JSON.stringify(data));
+		//console.log('Properties '+JSON.stringify(page.bindingContext));
+	});
 
 
 	page.bindingContext = model;
 
 
 	var context = page.navigationContext;
-	console.log('Rendering view with context: '+JSON.stringify(context, null, "   "));
+	console.log('Rendering view with context: ' + JSON.stringify(context, null, "   "));
 	var container = page.getViewById("container");
 
 	var formName = "main";
@@ -1330,21 +1638,19 @@ ViewRenderer.prototype.renderView = function(page, model) {
 
 	me._viewName = formName;
 
-
-	
-	container.className = "form-" + formName;
+	me._addClass(container, "form-" + formName)
 
 
 
 
-	var elements=[];
+	var elements = [];
 
-	if(context.fields){
- 		elements = context.fields
-	}else{
+	if (context.fields) {
+		elements = context.fields
+	} else {
 
 		//backward compatibility for bcwf. parameters.forms!
-		var forms = global.parameters.views||global.parameters.forms;
+		var forms = global.parameters.views || global.parameters.forms;
 
 		if (typeof forms == 'string' && forms[0] == "{") {
 			forms = decodeVariable(forms);
@@ -1359,7 +1665,7 @@ ViewRenderer.prototype.renderView = function(page, model) {
 	}
 
 	if (!elements) {
-		throw 'Invalid form fields: (' + (typeof fields) + ') for ' + formName;
+		throw 'Invalid form fields: (' + (typeof elements) + ') for ' + formName;
 	}
 
 	me.renderFieldset(container, elements, model, page);
