@@ -2,6 +2,8 @@ function JSImageUtilites() {}
 JSImageUtilites.prototype = {};
 
 function ObjectAppend(a, b){
+    a=a||{};
+    b=b||{};
 	Object.keys(b).forEach(function(k){
 		a[k]=b[k];
 	});
@@ -1104,6 +1106,21 @@ JSTextUtilities.ParseHtmlTags = function(text, tagname) {
         startFrom = end;
     }
     return items;
+};
+
+JSTextUtilities.StripTags = function(text) {
+
+    parts=([text.substring(0, text.indexOf('<'))]).concat(text.split('>').slice(1));
+
+     return parts.map(function(t){
+       return  t.split('<')[0]
+    }).filter(function(t){
+        if((!t)||t==''){
+            return false;
+        }
+        return true;
+    }).join(' ')
+    
 };
 
 JSTextUtilities.StripHtmlTags = function(text, tagname) {

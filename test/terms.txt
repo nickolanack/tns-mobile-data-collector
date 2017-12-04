@@ -1,0 +1,73 @@
+<h1>
+Terms of Use
+</h1>
+<br/>
+This Agreement may be amended by {appOwner} from time to time without specific advance notice to you.
+<br/>
+The latest Agreement will be posted on the Application, and you should review the Agreement prior to using the Application.
+<br/>
+<h1>
+2. Editing, Deleting and Modification
+</h1>
+<br/>
+{appOwner} reserves the right in its sole discretion to edit the Application, including any documents, information or other content appearing on the Application.
+<br/>
+<h1>
+3. Compliance with Laws
+</h1>
+<br/>
+You agree to comply with all applicable federal, provincial, and local laws, rules, and regulations, including but not limited to privacy laws or the laws of trespass. Without limiting the foregoing, you agree that you will not use the Application to a private property without permission, and will not otherwise engage in any activity that may result in injury, death, property damage, or liability of any kind. You understand and agree that you have no power to confront or apprehend violators beyond those of any other civilian. You are an extra set of eyes and ears for natural resource enforcement officers.
+<br/>
+<h1>
+4. Assumption of Risk
+</h1>
+<br/>
+You agree that your use of the Application is at your own risk. You acknowledge that you are aware of the risks inherent in the use of the Application, including the possibility of physical injury, property damage, or other losses. You nevertheless freely and voluntarily assume these risks.
+<br/>
+<h1>
+5. Limitation of Liability
+</h1>
+<br/>
+IN NO EVENT SHALL {appOwner} OR ITS OFFICERS, DIRECTORS, EMPLOYEES, VOLUNTEERS AND AGENTS (THE
+“{appOwner} PARTIES”) BE LIABLE WHATSOEVER FOR YOUR USE OF THE APPLICATION. IN PARTICULAR, BUT
+NOT AS A LIMITATION THEREOF, {appOwner} AND THE {appOwner} PARTIES SHALL NOT BE LIABLE FOR ANY
+INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, WHETHER BASED ON BREACH OF
+CONTRACT, BREACH OF WARRANTY, TORT (INCLUDING NEGLIGENCE) OR OTHERWISE, EVEN IF ADVISED
+OF THE POSSIBILITY OF SUCH DAMAGES. THE NEGATION OF DAMAGES SET FORTH ABOVE ARE
+FUNDAMENTAL ELEMENTS OF THE BASIS OF THE BARGAIN BETWEEN YOU AND {appOwner}. THE
+APPLICATION WOULD NOT BE PROVIDED WITHOUT SUCH LIMITATIONS.
+<br/>
+<h1>
+6. Disclaimer
+</h1>
+<br/>
+{appOwner} PROVIDES THE APPLICATION “AS IS”, “AS AVAILABLE” AND ALL WARRANTIES, EXPRESS OR
+<br/>
+IMPLIED, ARE DISCLAIMED (INCLUDING BUT NOT LIMITED TO THE DISCLAIMER OF ANY IMPLIED
+<br/>
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE).
+<br/>
+<h1>
+7. Indemnification
+</h1>
+<br/>
+You agree to indemnify, defend and hold {appOwner} and the {appOwner} Parties harmless from any liability, loss, claim and expense, including reasonable legal fees, related to your violation of this Agreement or your use of the Application.
+<br/>
+<h1>
+8. Use of Information
+</h1>
+<br/>
+{appOwner} reserves the right, and you authorize {appOwner}, to the use and assignment of all information regarding your use of the Application and all information provided by you in any manner consistent with {appOwner}’s privacy policy.
+<br/>
+<h1>
+9. Non-transferable
+</h1>
+<br/>
+Your right to use the Application is not transferable. Any password or right given to you to obtain access is not transferable.
+<br/>
+<h1>
+10. Contact Information
+</h1>
+<br/>
+If you have questions about the Application or this Agreement, please contact {appOwner} at {appName|kebab}@{domain} or {appContactNumber}.
+<br/>

@@ -674,15 +674,19 @@ DataAcquisitionApplication.prototype.getFormData = function() {
     return JSON.parse(JSON.stringify(data)); //remove any references
 }
 
-global.submitForm = function() {
-    return instance.submitForm();
+global.submitForm = function(callback) {
+    return instance.submitForm(callback);
 }
-DataAcquisitionApplication.prototype.submitForm = function() {
+DataAcquisitionApplication.prototype.submitForm = function(callback) {
 
     var me=this;
 
     var data = global.getFormData();
     formData = {};
+    var callbackData={
+        isSubmitting:false,
+        submittingStateLabel:""
+    }
     global.storeFormJson(data).then(function(file) {
         if (me.isOnline()) {
             me._processFormFile(file, null, function(err) {
@@ -693,6 +697,7 @@ DataAcquisitionApplication.prototype.submitForm = function() {
                         eventName: "submitFormFailed",
                         object: me
                     };
+                    callback(callbackData);
                     me.notify(eventData);
 
                     return;
@@ -702,6 +707,7 @@ DataAcquisitionApplication.prototype.submitForm = function() {
                     eventName: "submitFormSuccess",
                     object: me
                 };
+                callback(callbackData);
                 me.notify(eventData);
 
             });
@@ -712,6 +718,7 @@ DataAcquisitionApplication.prototype.submitForm = function() {
             eventName: "queuedForm",
             object: me
         };
+        callback(callbackData);
         me.notify(eventData);
 
     })
@@ -722,7 +729,11 @@ DataAcquisitionApplication.prototype.submitForm = function() {
         clearHistory: true,
         //backstackVisible:false,
         context: {
-            form: require('../').Configuration.SharedInstance().get("mainView","menu")
+            form: require('../').Configuration.SharedInstance().get("mainView","menu"),
+            data:{
+                isSubmitting:true,
+                submittingStateLabel:"Uploading"
+            }
         }
     });
 

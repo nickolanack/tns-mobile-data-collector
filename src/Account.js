@@ -104,7 +104,7 @@ Account.prototype.getDevice = function() {
 				resolve(device);
 
 			}).catch(function(err) {
-				console.log('Registration Error: ' + JSON.stringify(err));
+				console.log('Registration Error: ' + JSON.stringify(err)+'Device": '+JSON.stringify(device));
 				reject(err);
 			})
 		});

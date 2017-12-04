@@ -1,110 +1,63 @@
-"use strict";
-/**
- * Deprecated going to replace with FormViewRenderer!
- */
+ListViewRenderer.js
 
-var labelModule;
-var imageModule;
-var ImageSource;
 
-var gridLayoutModule;
-var stackLayoutModule;
 
-var GridLayout;
-var ItemSpec;
 
-var getConfiguration=function(){
-	 return require('../').Configuration.SharedInstance();
+function ListViewRenderer() {
+
+
+	var me = this;
+
+	/**
+	 * Render simple items, fields, buttons etc.
+	 */
+	me._renderer = require('../').ViewRenderer.SharedInstance();;
 }
 
 
-function ListViewRenderer(container) {
+
+var extend = function(a, b) {
+
+	b = b || {};
+	Object.keys(b).forEach(function(k) {
+		a[k] = b[k];
+	});
+
+	return a;
+}
 
 
 
- labelModule = require("ui/label");
- imageModule = require("ui/image");
- ImageSource = require("image-source");
-
- gridLayoutModule = require("ui/layouts/grid-layout");
- stackLayoutModule = require("ui/layouts/stack-layout");
-
- GridLayout = gridLayoutModule.GridLayout;
- ItemSpec = gridLayoutModule.ItemSpec ;
-
-
-
+ListViewRenderer.prototype.renderSplit = function(container, field) {
 
 	var me=this;
-	var emptyLabel=renderLabel({
-			"value": "loading"
-	});
-	//var empty=renderStack([emptyLabel]);
-	//empty.className="empty";
-	container.addChild(emptyLabel);
-	//me.empty=empty;
-	me.emptyLabel=emptyLabel;
-};
+
+	var left=field.left||false;
+	var right=field.right||false;
 
 
 
+	var options=extend({
+		"left":[80, "pixel"],
+		"right":[1, "star"]
+	}, field.options||{})
 
-var renderLabel = function(field) {
-
-
-
-	var label = new labelModule.Label();
-	label.text = field.value;
-	label.className = "label";
-	return label;
-
-}
-
-var renderHeading = function(field) {
-
-	var label = new labelModule.Label();
-	label.text = field.value;
-	label.className = "heading";
-	return label;
-
-}
-
-var renderImage = function(url) {
-	var image = new imageModule.Image();
-	var src='https://' + global.client.getUrl() + "/" + url;
-
-	if(url[0]==="~"){
-		src=url;
-	}
-
-	image.src = src
-	return image;
-}
-
-var renderStack = function(items) {
-	var stackLayout = new stackLayoutModule.StackLayout();
-
-	items.forEach(function(item){
-		stackLayout.addChild(item);
-	})
-
-	return stackLayout;
-}
-
-var grid = function(container, left, right) {
+ 	var GridLayout = require("ui/layouts/grid-layout").GridLayout;
+ 	var ItemSpec = require("ui/layouts/grid-layout").ItemSpec ;
 
 	var gridLayout = new GridLayout();
-	var firstColumn = new ItemSpec(80, "pixel");
-	var secondColumn = new ItemSpec(1, "star");
+	var firstColumn = new ItemSpec(options.left[0], options.left[1]);
+	var secondColumn = new ItemSpec(options.right[0], options.right[1]);
 	var firstRow = new ItemSpec(1, "auto");
 	gridLayout.addColumn(firstColumn);
 	gridLayout.addColumn(secondColumn);
 	gridLayout.addRow(firstRow);
 
 
-	var line=renderLabel({
-			"value": ""
-		});
+	var line=me._renderer._createText({
+		"value": "",
+		"className":"label"
+	});
 
 	GridLayout.setColumn(line, 0);
 	GridLayout.setRow(line, 0);
@@ -112,18 +65,31 @@ var grid = function(container, left, right) {
 	line.className="line";
 
 
-	if(!left){
-		left=renderLabel({
-			"value": ""
-		});
-	}
+	// if(!left){
+	// 	left={
+	// 		"value": "",
+	// 		"type":"label"
+	// 	};
+	// }
 
-	if(!right){
-		right=renderLabel({
-			"value": ""
-		});
-	}
+	// if(!right){
+	// 	right={
+	// 		"value": "",
+	// 		"type":"label"
+	// 	};
+	// }
 
+
+	var stack=me._renderer._createStack();
+	me._renderer._renderFields(stack, left);
+	left=stack;
+
+
+
+	var stack=me._renderer._createStack();
+	me._renderer._renderFields(stack, right);
+	right=stack;
+	
 
 
 
@@ -139,87 +105,145 @@ var grid = function(container, left, right) {
 	right.className+=" right";
 
 	container.addChild(gridLayout);
+	me._renderer._addClass(gridLayout, field);
+
 	return gridLayout;
 }
+ListViewRenderer.prototype._parseLiterals = function(str, template, params) {
 
+	var me = this;
 
-
-var renderList = function(list, container, model, page) {
-
-	var moment = require('moment');
-
-
-	grid(container, null, renderLabel({
-				"value": "Today, "+moment().format('dddd MMMM Do')
-			})).className="first";
-
-	list.forEach(function(item) {
-
-		console.log('render item ' + item.name);
-
-		console.log(JSON.stringify(item, null, '   '));
-		console.log(JSON.stringify(images, null, '   '));
-
-		console.log(container);
-
-		
-		
-		var time=renderLabel({
-			"value": /*" #" + Math.round(((item.id * 1.3) + 99999)) + ' ' +*/ moment(item.creationDate+" GMT-0000").fromNow()
-		});
-		time.className+=" time";
-		grid(container, null, time);
-
-
-		var Parser = require('./HtmlParser.js');
-		var images = Parser.ParseImages(item.description);
-
-		
-	
-
-
-		var stack=renderStack([
-			renderHeading({
-				"value": item.name
-			}),
-			renderLabel({
-				"value": item.point[0]+', '+item.point[1]
-			}),
-			renderImage(images[0].url)
-		]);
-		stack.className+=" item";
-		grid(container, renderImage(item.icon), stack);
-
-
-		
-
-
-	});
-	
-	grid(container, renderImage("~/bcwf-logo-filled-140.png"),renderLabel({
-			"value": "Created Account, "+moment(getConfiguration().getLocalDataModifiedDate("account")).fromNow()
-		})).className="second-last";
-	grid(container, null,null).className="last";
-
-
-	if (list.length === 0) {
-		
+	if(!params){
+		params = me._renderer._params();
 	}
+	
+	return me._renderer._getParser().renderLiterals(str, params, template);
 
 }
 
-
-
-ListViewRenderer.prototype.renderList = function(list, container, model, page) {
-	var me=this;
-	if(list.length){
-		container.removeChild(me.emptyLabel);
-		renderList(list, container, model, page);
-		console.log('rendered list');
-	}else{
-		me.emptyLabel.text="You have not created any reports";
-	}
+ListViewRenderer.prototype.renderList = function(container, field) {
 	
+	var me=this;
+	var list=field;
+	if(list.list){
+		list=list.list;
+	}
+
+	
+
+	var stack=me._renderer._createStack();
+	container.addChild(stack);
+	me._renderer._addClass(stack, "list");
+	me._renderer._addClass(stack, field);
+
+	me._resolveList(list).then(function(list){
+
+		try{
+			console.log('Resolved list');
+
+			var model=me._renderer._model;
+		
+			if(list&&list.length>0){
+				if(field.before){
+					me._renderer._renderFields(stack, field.before);
+				}
+
+
+				var fieldSetList=me._renderer._parse(list, field.listItemFormat||"{value}");
+
+				if(field.sort){
+					fieldSetList=fieldSetList.sort(function(a, b){
+						var sa=me._renderer._parse(a, field.sort);
+						var sb=me._renderer._parse(b, field.sort);
+						//console.log('sort: '+sa+' '+sb);
+						return sa>sb?1:0;
+						
+					})
+				}
+
+				console.log("fieldSetList: "+JSON.stringify(fieldSetList));
+				var listItemStack=me._renderer._createStack();
+				container.addChild(listItemStack);
+				var renderItemsFieldset=function(fieldSet){
+						
+
+
+						var fields=me._parseLiterals(fieldSet, field.listItemFields);
+						//console.log(JSON.stringify(fields, null, '   '));
+
+						try{
+
+							me._renderer._renderFields(stack, fields);
+
+						}catch(e){
+ 							console.log('Some List Error: '+e+ JSON.stringify(fields, null, '   '));
+						}
+
+					
+				};
+				fieldSetList.splice(0, 10).forEach(renderItemsFieldset);
+				var interval=setInterval(function(){
+					fieldSetList.splice(0, 10).forEach(renderItemsFieldset);
+					if(fieldSetList.length==0){
+						clearInterval(interval);
+					}
+				},2000);
+				
+
+
+				if(field.after){
+
+					
+
+					me._renderer._renderFields(stack, field.after);
+
+					
+				}
+
+			}
+
+
+			if (list.length === 0) {
+				if(field.empty){
+					me._renderer._renderFields(stack, field.empty);
+				}
+		}
+
+		}catch(e){
+			console.log('Some List Error: '+e)
+		}
+
+	}).catch(function(e){
+		console.log('List Error: '+e);
+	});
+	
+
+
+	
+
+}
+
+ListViewRenderer.prototype.setListResolver = function(name, fn) {
+	var me=this;
+	if(!me._listResolvers){
+		me._listResolvers={};
+	}
+	me._listResolvers[name]=fn;
+}
+
+ListViewRenderer.prototype._resolveList = function(list) {
+	var me=this;
+	if(typeof list=='string'){
+		var args=[];
+		var promise = me._listResolvers[list].apply(null, args);
+		console.log('Return Promise');
+		return promise;
+	}
+
+	return new Promise(function(resolve){
+		resolve(list);
+	});
 }
 
 module.exports = ListViewRenderer;
+
