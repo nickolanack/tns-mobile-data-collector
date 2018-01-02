@@ -2,32 +2,32 @@ var dialogs;
 var Pusher;
 var IPublicChannelEventListener;
 
-function Messages() {
+function Messages(params) {
 
 
 	dialogs = require("ui/dialogs");
 	Pusher = require("pusher-nativescript").Pusher;
 	IPublicChannelEventListener = require("pusher-nativescript/interfaces");
 
-var me=this;
-me.prefix='mobile.';
+	var me=this;
+	me.prefix=params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.';
+	console.log('Initializing pusher: '+params.pusherAppKey+' + '+me.prefix);
+	// Creating a new Pusher instance
+	var pusher = new Pusher(params.pusherAppKey);
+	 
+	// Establishing a connection with Pusher
+	pusher.connect().then(() => {
+	  // Connected successfully
+	}).catch(error => {
+	  // Handling connection errors
+	  console.log(error);
+	});
+	 
+	me.pusher=pusher;
 
-// Creating a new Pusher instance
-var pusher = new Pusher('74594f87fe548689b03a');
- 
-// Establishing a connection with Pusher
-pusher.connect().then(() => {
-  // Connected successfully
-}).catch(error => {
-  // Handling connection errors
-  console.log(error);
-});
- 
-me.pusher=pusher;
-
- 
-// Disconnecting from the service
-//pusher.disconnect();
+	 
+	// Disconnecting from the service
+	//pusher.disconnect();
 
 
 
@@ -42,9 +42,20 @@ Messages.prototype.subscribe = function(channel, event, callback) {
 	var me=this;
 	if(!callback){
 		callback=function(data){
+
+			if(data.text){
+				me.alert({
+					"message":JSON.stringify(data.text)
+				});
+				return;
+			}
+
+
+			//default
+
 			me.alert({
 				"message":JSON.stringify(data)
-			})
+			});
 		};
 	}
 

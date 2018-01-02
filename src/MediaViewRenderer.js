@@ -25,7 +25,6 @@ var extend = function(a, b) {
 }
 
 
-
 MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 	var me = this;
@@ -81,10 +80,22 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 						var imagePath=null;
 
 						var imageAssetModule = require("tns-core-modules/image-asset/image-asset");
+
+						var assetName=false;
+						
+
+						me._storeAsset(imageAsset).then(function(name){
+							imagePath=name;
+							imageAssets.push(name);
+							me._renderer._model.set(field.name, imageAssets);
+						});
+
 						var buttonset=me._renderer.renderButtonset(mediaSelection, {
+							"className":'image-selection',
 							"buttons": [
 							{
 								"icon": imageAsset,
+								"stretch":"aspectFill",
 								"className": "image-icon",
 								"action":"form",
 								"name":"image-viewer",
@@ -97,16 +108,23 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 								
 							}, {
 								"icon": "remove-media",
+								"className": "remove-media",
 								"action": function() {
+									mediaSelection.removeChild(buttonset);
+									var i=imageAssets.indexOf(imagePath);
+									if(i>=0){
+										imageAssets.splice(i,1);
+										me._renderer._model.set(field.name, imageAssets);
 
+
+										if (field.required && imageAssets.length == 0) {
+											addPhoto();
+										}
+
+
+									}
 								}
 							}]
-						});
-
-						me._storeAsset(imageAsset).then(function(name){
-							imagePath=name;
-							imageAssets.push(name);
-							me._renderer._model.set(field.name, imageAssets);
 						});
 						
 

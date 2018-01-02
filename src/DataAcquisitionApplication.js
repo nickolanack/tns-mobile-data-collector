@@ -144,7 +144,7 @@ DataAcquisitionApplication.prototype.getMessageManager=function(){
 
 
     var Messages = require('../').Messages;
-    var messages=new Messages();
+    var messages=new Messages(me.options.parameters);
 
     me._messageManager=messages;
     return me._messageManager

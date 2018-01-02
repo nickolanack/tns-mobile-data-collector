@@ -55,8 +55,8 @@ console.log("result: "+JSON.stringify(template.render(require(__dirname+'/list.j
 		]}), null, '  '))
 
 
-var moment = require('moment');
-console.log(template.render("Today, {now|date}"));
+// var moment = require('moment');
+// console.log(template.render("Today, {now|date}"));
 
 
 //TODO support string.
@@ -68,6 +68,8 @@ console.log(template.render("Today, {now|date}"));
 console.log(template.render('{someBool|?"cool":"not cool"}',{someBool:true}));
 
 
+
+console.log(template.render('{someBool|?"http://true":"http://false"}',{someBool:false}));
 
 
 

@@ -27,6 +27,7 @@ var utilityModule;
 
 var instance;
 
+
 function ViewRenderer() {
 
 
@@ -430,11 +431,17 @@ ViewRenderer.prototype._addEnabled = function(el, enabled) {
 
 }
 
+var _isArray=function(thing){
+	return Object.prototype.toString.call(thing) === "[object Array]";
+}
+var _isObject=function(thing){
+	return Object.prototype.toString.call(thing) === "[object Object]";
+}
 
 ViewRenderer.prototype._removeClass = function(el, className) {
 
 	var me=this;
-	if(Object.prototype.toString.call(className) == "[object Array]"){
+	if(_isArray(className)){
 		console.log('Remove Class Names Array: '+JSON.stringify(className));
 		className.forEach(function(c){
 			me._removeClass(el, c);
@@ -827,7 +834,7 @@ var renderIconselect = function(container, field, model) {
 		wrapLayout.addChild(imageStack);
 
 		var stackLayout = new stackLayoutModule.StackLayout();
-		instance._addClass(stackLayout, "icon value-" + icon.value.toLowerCase());
+		instance._addClass(stackLayout, "icon value-" + icon.value.toLowerCase().split(' ').join('-'));
 
 		imageStack.addChild(stackLayout);
 
@@ -879,6 +886,11 @@ var renderImage = function(container, field) {
 
 
 	var image = instance._createImage(field);
+
+	if(field.stretch){
+		image.stretch = field.stretch;
+	}
+
 	container.addChild(image);
 
 	if(field.action){
@@ -914,7 +926,7 @@ ViewRenderer.prototype._createImage = function(field) {
 		url=url();
 	}
 
-	if(Object.prototype.toString.call(url) == "[object Array]"&&url.length==1&&typeof url[0]=="string"){
+	if(_isArray(url)&&url.length==1&&typeof url[0]=="string"){
 		url=url[0];
 	 }
 
@@ -929,7 +941,7 @@ ViewRenderer.prototype._createImage = function(field) {
 		 
 	}
 
-	if(Object.prototype.toString.call(url) == "[object Array]"&&url.length==1&&typeof url[0]=="string"){
+	if(_isArray(url)&&url.length==1&&typeof url[0]=="string"){
 		 	/**
 		 	 * support for using core-app imageset image which is always an array with image url at 0 (possibly multiple images...);
 		 	 * @type {[type]}
@@ -1101,6 +1113,10 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 			if(typeof icon=='string'&&icon[0]=="{"){
 				icon=me._createImage(icon);
 				stackLayout.addChild(icon);
+
+				if(field.stretch){
+					icon.stretch = field.stretch;
+				}
 			
 				if(field.label){
 					renderLabel(imageStack, {
@@ -1114,6 +1130,11 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 				console.log('Assume that field.icon is an imageAsset');
 				var image = me._imageFromImageAsset(icon);
 				stackLayout.addChild(image);
+
+				if(field.stretch){
+					image.stretch = field.stretch;
+				}
+				
 			
 				if(field.label){
 					renderLabel(imageStack, {
@@ -1140,6 +1161,10 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 						renderLabel(imageStack, {
 							value: field.label
 						})
+					}
+
+					if(field.stretch){
+						image.stretch = field.stretch;
 					}
 					
 
@@ -1235,13 +1260,27 @@ ViewRenderer.prototype.applyTapAction = function(button, action) {
 	if (action == 'link') {
 
 		button.on(buttonModule.Button.tapEvent, function() {
-			utilityModule.openUrl(field.link);
+
+			var link=me._parse(field.link);
+			console.log(link)
+			utilityModule.openUrl(link);
 			return;
 		});
 
 	}
 
-	if (action == 'form'||action == 'view') {
+	if (action == 'share') {
+
+		var SocialShare = require("nativescript-social-share"); //loads faster here
+		button.on(buttonModule.Button.tapEvent, function() {
+			SocialShare.shareUrl(me._parse(field.link), field.linkLabel||"Some Text", "How do you want to share "+(field.linkTargetType||"this app"));
+
+			return;
+		});
+
+	}
+
+	if (action == 'form'|| action == 'view'|| action == 'list') {
 		button.on(buttonModule.Button.tapEvent, function() {
 			var topmost = frameModule.topmost();
 
@@ -1301,7 +1340,7 @@ ViewRenderer.prototype._setSelected = function(button, field, buttons) {
 	}
 
 
-	if (field.action == 'form') {
+	if (field.action == 'form'||field.action == 'view'||field.action == 'list') {
 
 
 
@@ -1323,8 +1362,21 @@ ViewRenderer.prototype._setSelected = function(button, field, buttons) {
 		return;
 	} else if (field.action == 'link') {
 
-		utilityModule.openUrl(field.link);
+		var link=me._parse(field.link);
+		console.log(link)
+		utilityModule.openUrl(link);
 		return;
+
+	} else if (field.action == 'share') {
+
+		button.on(buttonModule.Button.tapEvent, function() {
+		
+
+			var SocialShare = require("nativescript-social-share");
+			SocialShare.shareUrl(me._parse(field.link), field.linkLabel||"Some Text", "How do you want to share "+(field.linkTargetType||"this app"));
+
+			return;
+		});
 
 	} else if (field.action != 'none') {
 
@@ -1586,11 +1638,11 @@ ViewRenderer.prototype._renderFields = function(container, fields) {
 		}
 
 
-		if((Object.prototype.toString.call(fields) == "[object Object]")){
+		if(_isObject(fields)){
 			fields=[fields];
 		}
 
-		if(Object.prototype.toString.call(fields) == "[object Array]") {
+		if(_isArray(fields)) {
 			//console.log('Create StackLayout Array "right" '+JSON.stringify(right));
 			var elements=[];
 			fields.forEach(function(field) {
@@ -1740,7 +1792,7 @@ ViewRenderer.prototype._renderConditionalFieldset = function(container, field) {
 
 	
 		stack.on(gestures.GestureTypes.swipe, function (args) {
-			if(Object.prototype.toString.call(field.swipe) == "[object Object]"){
+			if(_isObject(field.swipe)){
 				Object.keys(field.swipe).forEach(function(k){
 					me._model.set(k, field.swipe[k]);
 				})
@@ -2066,14 +2118,7 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 		elements = context.fields
 	} else {
 
-		//backward compatibility for bcwf. parameters.forms!
-		var forms = global.parameters.views || global.parameters.forms;
-
-		if (typeof forms == 'string' && forms[0] == "{") {
-			forms = me._parse(forms);
-		}
-
-		elements = forms[formName];
+		elements = me._getViewElements(['views', 'forms', 'lists', 'default-views'], formName);
 	}
 
 
@@ -2101,7 +2146,32 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 }
 
+ViewRenderer.prototype._getViewElements=function(name, view){
 
+	var me=this;
+	var names=name;
+	if(!_isArray(name)){
+		names=[name];
+	}
+	
+	name=names.shift();
+	console.log('look for view elements in '+name);
+	var views = global.parameters[name] || false;
+
+	if (typeof views == 'string' && views[0] == "{") {
+		views = me._parse(views);
+	}
+
+	if(views&&views[view]){
+		return views[view];
+	}
+
+	if(names.length){
+		return me._getViewElements(names, view);
+	}
+
+	return false
+}
 
 
 /**
@@ -2150,7 +2220,7 @@ ViewRenderer.prototype._createStack = function(items) {
 				stackLayout.addChild(item);
 				return;
 			}
-			if((Object.prototype.toString.call(item) == "[object Object]")){
+			if(_isObject(item)){
 				me.renderField(stackLayout, item);
 				return;
 			}

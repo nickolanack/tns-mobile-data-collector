@@ -189,7 +189,10 @@ Account.prototype.login = function() {
 
 					var eventData = {
 						eventName: "login",
-						object: me
+						object: me,
+						user:user.id,
+						device:credentials.device.id
+
 					};
 					me.notify(eventData);
 

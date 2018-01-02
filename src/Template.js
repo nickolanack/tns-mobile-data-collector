@@ -5,7 +5,6 @@ function Template() {
 }
 
 
-
 var BasePath='.';
 Template.SetJsonPath=function(path){
 
@@ -33,6 +32,25 @@ Template.prototype._format = function(data, formatters) {
 
 		if(format.indexOf('?')===0){
 			var options=format.substring(1).split(':');
+			if(options.length>2){
+				
+				/**
+				 * simple (not perfect?) method to ignore quote encapsulated `:` chars like this ?`::`:`:` the first 2 and last 1 are wrapped in `
+				 */
+
+				for(var i=1;i<options.length;i++){
+					var prev=options[i-1];
+					prev=prev.substring(prev.length-1);
+
+					var next=options[i][0];
+
+					if(prev===next&&(['`','"',"'"]).indexOf(prev)>=0){
+						
+						options=[options.slice(0, i).join(':'), options.slice(i).join(':')];
+						break;
+					}
+				}
+			}
 			if(options.length==1){
 				if(options[0]===""){
 					options[0]=true;
@@ -99,33 +117,38 @@ Template.prototype._format = function(data, formatters) {
 			
 		}
 
-		if(format==="dateFromNow"){
-			//console.log("Date: "+data);
-			var moment = require('moment');
-			if(data[data.length-1]!=='Z'){
-				data=data+"Z";
+		try{
+			if(format==="dateFromNow"){
+
+				//console.log("Date: "+data);
 				
-			}	
-			data=moment(data).fromNow();
-		}
-		if(format==="date"){
-			//console.log("Date: "+data);
-			var moment = require('moment');
-			if(data[data.length-1]!=='Z'){
-				data=data+"Z";
+				var moment = require('moment');
+				if(data[data.length-1]!=='Z'){
+					data=data+"Z";
+					
+				}	
+				data=moment(data).fromNow();
 				
-			}	
-			data=moment(data).format('dddd MMMM Do');
-		}
-		if(format==="time"){
-			//console.log("Date: "+data);
-			var moment = require('moment');
-			if(data[data.length-1]!=='Z'){
-				data=data+"Z";
-				
-			}	
-			data=moment(data).format('LTS');
-		}
+			}
+			if(format==="date"){
+				//console.log("Date: "+data);
+				var moment = require('moment');
+				if(data[data.length-1]!=='Z'){
+					data=data+"Z";
+					
+				}	
+				data=moment(data).format('dddd MMMM Do');
+			}
+			if(format==="time"){
+				//console.log("Date: "+data);
+				var moment = require('moment');
+				if(data[data.length-1]!=='Z'){
+					data=data+"Z";
+					
+				}	
+				data=moment(data).format('LTS');
+			}
+		}catch(e){}
 
 		if(format==="url"&&data.indexOf('https://')!==0){
 			data='https://' + global.client.getUrl() + "/" + data;
@@ -144,6 +167,17 @@ Template.prototype._render = function(template, data, prefix) {
 	var me = this;
 
 	data.now=(new Date()).toISOString();
+
+	try{
+		if(require("application").ios){
+			data.ios=true;
+			data.android=false;
+		}else{
+			data.ios=false;
+			data.android=true;
+		}
+	}catch(e){}
+
 	try{
 		data.accountCreationDate=require('../').Configuration.SharedInstance().getLocalDataModifiedDate("account");
 	}catch(e){}
