@@ -26,14 +26,13 @@ CoreAppClient.NativeScriptClient=function(domain){
 	        }).join('&');
 	        var http = require('http');
 
-	        var url = 'https://' + options.host + options.path
-
-	        console.log(url + ' form: ' + form);
+	        var url = options.protocol+'://' + options.host + options.path
+	        console.info(url + '&' + form);
 
 
 	        var timeout=setTimeout(function() {
 
-	            console.log('Request timed out '+JSON.stringify(options));
+	            console.error('Request timed out '+JSON.stringify(options));
 	            timeout=null;
 	            callback('Request timed out');
 
@@ -50,7 +49,7 @@ CoreAppClient.NativeScriptClient=function(domain){
 	        }).then(function(response) {
 
 	            if(!timeout){
-	                console.log('already timed out');
+	                console.warn('already timed out');
 	                return;
 	            }
 	            clearTimeout(timeout);
@@ -58,7 +57,7 @@ CoreAppClient.NativeScriptClient=function(domain){
 	            callback(null, response, response.content);
 
 	        }, callback).catch(function(e){
-	            console.log('Request Failed: '+e);
+	            console.error('Request Failed: '+e);
 	            callback(e);
 	        });
 	    },
@@ -104,23 +103,43 @@ var promise=function(callback){
 }
 
 CoreAppClient.prototype.getUrl = function() {
-	var me=this;
-	return me.config.url;
+	return this.config.url;
+}
+
+var _isIPV4Address= function(domain){
+	return domain.split(":").shift().split('.').length===4
+}
+
+CoreAppClient.prototype.getProtocol = function() {
+
+	if(this.config.protocol){
+		return this.config.protocol;
+	}
+
+	if(_isIPV4Address(this.getUrl())){
+		return 'http';
+	}
+	return 'https';
+}
+
+CoreAppClient.prototype.getPath = function() {
+	if(this.getProtocol()=="http"){
+		return "core.php?0=1&format=ajax";
+	}
+	return "administrator/components/com_geolive/core.php?0=1&format=ajax"
 }
 
 
 CoreAppClient.prototype.getPathForTask = function(task, pathComponent) {
 
-	var me=this;
-
-	var path = "administrator/components/com_geolive/core.php?0=1&format=ajax";
+	var path = this.getPath();
 
 	if (pathComponent) {
 		path=pathComponent;
 	}
 
-	if (me._token) {
-		path=path+"&access_token="+me._token.token;
+	if (this._token) {
+		path=path+"&access_token="+this._token.token;
 	}
 
 	path=path+'&task='+task;
@@ -147,7 +166,7 @@ CoreAppClient.prototype.request = function(options, data) {
 		(me.config.request||request)(options, data, function(err, response, content) {
 
 			if (err) {
-				console.log('Client Request error: '+err);
+				console.error('Client Request error: '+err);
 				reject(err);
 				return;
 			}
@@ -157,7 +176,7 @@ CoreAppClient.prototype.request = function(options, data) {
            	try{
 				var obj = JSON.parse(content);
 			}catch(e){
-				console.log('Request Json Error: '+JSON.stringify(options)+' '+content);
+				console.error('Request Json Error: '+JSON.stringify(options)+' '+content);
 				reject(e+": "+content);
 				return;
 			}
@@ -168,7 +187,7 @@ CoreAppClient.prototype.request = function(options, data) {
 					resolve(obj);
 					return;
 				}
-				console.log('Request Json Error: Expected response.success==true for '+JSON.stringify(options));
+				console.error('Request Json Error: Expected response.success==true for '+JSON.stringify(options));
 				reject(obj);
 				return;
 			}
@@ -198,7 +217,8 @@ CoreAppClient.prototype.task = function(task, params, pathComponent) {
 	//console.log('task: '+task+" : "+me.getPathForTask(task, pathComponent));
 
 	return me.request({
-		host: me.config.url,
+		protocol:me.getProtocol(),
+		host: me.getUrl(),
 		path: '/'+me.getPathForTask(task, pathComponent),
 		method: 'POST',
 	}, data);
@@ -263,7 +283,7 @@ CoreAppClient.prototype.login = function(username, password) {
 			})
 
 		}).catch(function(e){
-			console.log('Login Failed');
+			console.error('Login Failed');
 			reject(e);
 		});
 
@@ -319,33 +339,34 @@ CoreAppClient.prototype.subscribe = function(channel, event, handler) {
 CoreAppClient.prototype.broadcast = function(channel, event, data) {
 	var me = this;
 
-	return me.isConnected().then(function() {
-
-		return me.task("emit_notification", {
-			"plugin": "Notifications",
-			"channel": channel,
-			"event": event,
-			"data": data
-		});
-
+	return me.executeTask("emit_notification", {
+		"plugin": "Notifications",
+		"channel": channel,
+		"event": event,
+		"data": data
 	});
+
 
 
 
 }
 
 
+CoreAppClient.prototype.executeTask= function(task, data, pathComp) {
+	var me = this;
+	return me.isConnected().then(function() {
+		return me.task(task, data, pathComp);
+	});
+};
+
 
 CoreAppClient.prototype.getUserMetadata = function(user) {
 	var user = user > 0 ? user : -1
 	var me = this;
-	return me.isConnected().then(function() {
-
-		return me.task("user_metadata", {
-			"user": user
-		});
-
+	return me.executeTask("user_metadata", {
+		"user": user
 	});
+
 };
 
 
@@ -354,29 +375,22 @@ CoreAppClient.prototype.getUserMetadata = function(user) {
 
 CoreAppClient.prototype.registerDevice = function(deviceName) {
 	var me = this;
-	return me.isConnected().then(function() {
-
-		return me.task("register_device", {
-			"deviceName": deviceName,
-			"plugin":"Apps"
-		});
-
+	return me.executeTask("register_device", {
+		"deviceName": deviceName,
+		"plugin":"Apps"
 	});
+
 };
 
 
 
 CoreAppClient.prototype.createAccountForDevice = function(deviceId, provisioningKey) {
 	var me = this;
-	return me.isConnected().then(function() {
-
-		return me.task("create_account", {
-			"deviceId": deviceId,
-			"provisioningKey": provisioningKey,
-			"plugin":"Apps"
-		}, "index.php?option=com_geolive&format=ajax&iam=node-client.guest");
-
-	});
+	return me.executeTask("create_account", {
+		"deviceId": deviceId,
+		"provisioningKey": provisioningKey,
+		"plugin":"Apps"
+	}, "index.php?option=com_geolive&format=ajax&iam=node-client.guest");
 };
 
 
@@ -414,66 +428,64 @@ CoreAppClient.prototype.loginDevice = function(deviceId, accountId, username, pa
 	return me.promise(function(resolve, reject) {
 
 
-		 me.isConnected().then(function() {
-
-
-			me.task("login_device", {
+		 me.executeTask("login_device", {
 				"deviceId": deviceId,
 				"accountId": accountId,
 				"username": username,
 				"password": password,
 				"plugin":"Apps"
-			}, "index.php?option=com_geolive&format=ajax&iam=node-client.guest").then(function(user) {
+			},  "index.php?option=com_geolive&format=ajax&iam=node-client.guest").then(function(user) {
 
 				me._id = user.id;
 				me._token = user.access_token;
 
+
 				resolve(user);
 
-			}).catch(reject);
+			}).catch(function(e){
+				//console.log('Why did this fail1'+e);
+				reject(e);
+			});
 
-		}).catch(reject);
+		});
 
-	});
 
 };
 
 
 CoreAppClient.prototype.createMarker = function(layerId, data, attributes) {
 	var me = this;
-	return me.isConnected().then(function() {
-
-		return me.task("marker_new", {
+	return me.executeTask("marker_new", {
 			"marker": data,
 			"attributes":attributes,
 			"layerId":layerId
-		});
-
 	});
 };
+
+CoreAppClient.prototype.createFeature= function(featureData) {
+	var me = this;
+	return  me.executeTask("marker_new", featureData);
+};
+
+
+
 
 
 CoreAppClient.prototype.getUsersMarkers = function() {
 	var me = this;
-	return me.isConnected().then(function() {
-
-		return me.task("users_mapitem_list", {
+	return me.executeTask("users_mapitem_list", {
 		});
 
-	});
 };
 
 CoreAppClient.prototype.getLayer = function(layerId) {
 	var me = this;
-	return me.isConnected().then(function() {
-
-		return me.task("layer_display", {
+	return me.executeTask("layer_display", {
 			"layerId":layerId,
 			"format":"json",
 			"plugin":"Maps"
-		});
-
 	});
+
 };
 
 

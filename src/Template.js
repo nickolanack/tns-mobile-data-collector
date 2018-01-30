@@ -60,6 +60,16 @@ Template.prototype._format = function(data, formatters) {
 			data=options[data?0:1];
 			if((['`','"',"'"]).indexOf(data[0])>=0){
 				data=data.substring(1, data.length-1);
+			}else{
+				if(data=='true'){
+					data = true;
+				}
+				if(data=='false'){
+					data = false;
+				}
+				if(!isNaN(parseInt(data))){
+					data=parseInt(data);
+				}
 			}
 		}
 
@@ -68,6 +78,9 @@ Template.prototype._format = function(data, formatters) {
 
 			var num=parseInt(format.split('round(')[1].split(')')[0]);
 			data=Math.round(parseFloat(data)*Math.pow(10,num))/Math.pow(10,num);
+
+			
+
 		}
 
 
@@ -151,7 +164,7 @@ Template.prototype._format = function(data, formatters) {
 		}catch(e){}
 
 		if(format==="url"&&data.indexOf('https://')!==0){
-			data='https://' + global.client.getUrl() + "/" + data;
+			data=global.client.getProtocol()+'://' + global.client.getUrl() + "/" + data;
 		}
 	});
 
@@ -159,12 +172,8 @@ Template.prototype._format = function(data, formatters) {
 
 }
 
-/*
- *  it is always safe to modify data object.
- */
-Template.prototype._render = function(template, data, prefix) {
+var addSystemVariables=function(data){
 
-	var me = this;
 
 	data.now=(new Date()).toISOString();
 
@@ -181,6 +190,28 @@ Template.prototype._render = function(template, data, prefix) {
 	try{
 		data.accountCreationDate=require('../').Configuration.SharedInstance().getLocalDataModifiedDate("account");
 	}catch(e){}
+
+
+	try{
+
+		var appversion = require("nativescript-appversion");
+		data.versionName=appversion.getVersionNameSync();
+		data.versionCode=appversion.getVersionCodeSync();
+		data.appId=appversion.getAppIdSync();
+
+	}catch(e){}
+
+}
+
+
+/*
+ *  it is always safe to modify data object.
+ */
+Template.prototype._render = function(template, data, prefix) {
+
+	var me = this;
+
+	addSystemVariables(data);
 	
 
 	if (!prefix) {

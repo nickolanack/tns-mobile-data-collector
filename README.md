@@ -8,7 +8,7 @@ define forms, views etc using parameters.json
 {
  
   /* 
-   * domain must be https! this is were your forms are submitted to,
+   * domain must be https! (or a local ip address) this is were your forms are submitted to,
    * and is the base url for resolving configuration and other   urls
    */
   "domain":"somedomain.ca", 

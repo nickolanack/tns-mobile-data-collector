@@ -14,10 +14,9 @@ var instance; //Deprecated!
 function DataAcquisitionApplication(client, params) {
 
     var me = this;
-    me._online=false;
+    me._online = false;
 
 
- 
 
     fs = require("file-system");
     frameModule = require("ui/frame");
@@ -26,20 +25,16 @@ function DataAcquisitionApplication(client, params) {
     template = new Template();
 
 
-    bghttp= require("nativescript-background-http");
+    bghttp = require("nativescript-background-http");
 
-   
+
     me.client = client;
     options = params;
-    me.options=params;
+    me.options = params;
 
-    instance=me;
+    instance = me;
 
 }
-
-
-
-
 
 
 
@@ -56,20 +51,20 @@ try {
 }
 
 
-DataAcquisitionApplication.SharedInstance=function(){
-    if(!instance){
+DataAcquisitionApplication.SharedInstance = function() {
+    if (!instance) {
         throw 'Singleton class requires instantiation';
     }
     return instance;
 }
 
 
-DataAcquisitionApplication.prototype.requireAccessToCamera=function(){
+DataAcquisitionApplication.prototype.requireAccessToCamera = function() {
 
-    return new Promise(function(resolve, reject){
+    return new Promise(function(resolve, reject) {
 
         var camera = require("nativescript-camera");
-        if(!camera.isAvailable()){
+        if (!camera.isAvailable()) {
             throw 'No camera available';
         }
 
@@ -86,30 +81,30 @@ DataAcquisitionApplication.prototype.requireAccessToCamera=function(){
 }
 
 
-DataAcquisitionApplication.prototype.requireAccessToGPS=function(){
+DataAcquisitionApplication.prototype.requireAccessToGPS = function() {
 
-    var me=this;
+    var me = this;
 
-    return new Promise(function(resolve, reject){
+    return new Promise(function(resolve, reject) {
 
         console.log('Request GPS');
 
-        
-        me.getGeolocation().enableLocationRequest().then(function(){
+
+        me.getGeolocation().enableLocationRequest().then(function() {
             console.log('Access To GPS Success');
             resolve(me.getGeolocation());
 
-        }).catch(function(e){
-            console.log('Access To GPS Failed '+e);
+        }).catch(function(e) {
+            console.log('Access To GPS Failed ' + e);
             //reject(e);
             //
             //
-             me.getGeolocation().enableLocationRequest().then(function(){
+            me.getGeolocation().enableLocationRequest().then(function() {
                 console.log('Access To GPS Success');
                 resolve(me.getGeolocation());
 
-            }).catch(function(e){
-                console.log('Access To GPS Failed '+e);
+            }).catch(function(e) {
+                console.log('Access To GPS Failed ' + e);
                 reject(e);
             });
         });
@@ -119,9 +114,9 @@ DataAcquisitionApplication.prototype.requireAccessToGPS=function(){
 
 }
 
-DataAcquisitionApplication.prototype.getGeolocation=function(){
-    var me=this;
-    if(!me._geolocation){
+DataAcquisitionApplication.prototype.getGeolocation = function() {
+    var me = this;
+    if (!me._geolocation) {
         me._geolocation = require("nativescript-geolocation");
     }
     return me._geolocation;
@@ -129,94 +124,79 @@ DataAcquisitionApplication.prototype.getGeolocation=function(){
 
 
 
+DataAcquisitionApplication.prototype.getMessageManager = function() {
 
-DataAcquisitionApplication.prototype.getMessageManager=function(){
-
-    var me=this;
-    if(me._messageManager){
+    var me = this;
+    if (me._messageManager) {
         return me._messageManager;
     }
 
-    if(me.options.messageManager){
-        me._messageManager=me.options.messageManager;
+    if (me.options.messageManager) {
+        me._messageManager = me.options.messageManager;
         return me._messageManager;
     }
 
 
     var Messages = require('../').Messages;
-    var messages=new Messages(me.options.parameters);
+    var messages = new Messages(me.options.parameters);
 
-    me._messageManager=messages;
+    me._messageManager = messages;
     return me._messageManager
 
 }
 
-DataAcquisitionApplication.prototype._renderTemplate=function(str, data, template){
+DataAcquisitionApplication.prototype._renderTemplate = function(template, data) {
 
-    var me=this;
-    if(!me._template){
+    var me = this;
+    if (!me._template) {
 
         var Template = require('../').Template;
-        me._template=new Template();
+        me._template = new Template();
     }
 
 
-    return me._template.render(str, data, template);
+    return me._template.render(template, me._params(data));
+
+}
+
+DataAcquisitionApplication.prototype._params = function(data) {
+
+    var me = this;
+
+    var params = JSON.parse(JSON.stringify(me.options.parameters));
+    params.data = JSON.parse(JSON.stringify(data));
+    return params;
 
 }
 
 
 
-DataAcquisitionApplication.prototype._sumbitFeature = function(data, callback) {
+DataAcquisitionApplication.prototype._submitData = function(data, callback) {
 
     var me = this;
 
     console.log(JSON.stringify(data, null, '   '));
-    console.log('Submit marker');
-
-    var attributes = {};
-
-    Object.keys(options.attributes).forEach(function(table) {
-
-        var values = {};
-        options.attributes[table].forEach(function(key) {
-
-            var value = data[key];
-
-            if (key.indexOf(':') > 0) {
-
-                var parts = key.split(':');
-
-                key = parts[0];
+    console.log('Submit form');
 
 
-                value = parts[1];
-                console.log('Check replacements for ' + key + ' => ' + value);
-                value = me._renderTemplate(value, data);
-            }
+    var formName = data._formName;
+    var templateName = formName;
+    if (options.parameters[templateName + '-template']) {
+        templateName = templateName + '-template';
+    }
+    if (!options.parameters[templateName]) {
+        throw 'Expecting template parameter: ' + formName + '-template, or ' + formName + ' for form';
+    }
+    var template = options.parameters[templateName];
+
+    var formData = me._renderTemplate(template, data);
 
 
-            values[key] = value;
+    console.log("Processed Form Data ("+formName+"): " + JSON.stringify(formData, null, '   '));
 
-        });
-        attributes[table] = values;
+    me._submitHandler(formData, formName).then(function(result) {
 
-    });
-     
-     var marker={
-            name: me._renderTemplate(options.marker.name || "Add Name!", data),
-            description: me._renderTemplate(options.marker.description, data),
-            coordinates: data.coordinates||data.location,
-            style: "DEFAULT"
-        };
-
-    console.log("Marker: "+JSON.stringify(marker, null, '   ')+" => layer:"+options.layer);
-
-    global.client.createMarker(
-        options.layer, marker, attributes
-    ).then(function(result) {
-
-        console.log('Created Marker');
+        console.log('Submitted Form: ' + JSON.stringify(result, null, '   '));
         callback();
 
     }).catch(function(err) {
@@ -231,14 +211,18 @@ DataAcquisitionApplication.prototype._sumbitFeature = function(data, callback) {
 };
 
 
+DataAcquisitionApplication.prototype.setSubmitHandler = function(handler) {
+    this._submitHandler = handler;
+}
+
 
 global.addProgressIndicator = function(start, progress, complete) {
     instance.addProgressIndicator(start, progress, complete);
 };
 global.setOnline = function() {
-     instance._setOnline();
+    instance._setOnline();
 }
-global.setOffline = function() { 
+global.setOffline = function() {
     instance._setOffline();
 }
 
@@ -258,9 +242,9 @@ DataAcquisitionApplication.prototype._taskIndicatorComplete = function() {
 
 
 DataAcquisitionApplication.prototype.addProgressIndicator = function(start, progress, complete) {
-    
-    var me=this;
-    
+
+    var me = this;
+
     me._taskIndicatorStart = start;
     me._taskIndicatorProgress = progress;
     me._taskIndicatorComplete = complete;
@@ -271,17 +255,17 @@ DataAcquisitionApplication.prototype.addProgressIndicator = function(start, prog
 
 
 DataAcquisitionApplication.prototype.isOnline = function() {
-    var me=this;
+    var me = this;
     return me._online;
 }
 
 DataAcquisitionApplication.prototype._setOnline = function() {
-    var me=this;
+    var me = this;
     me._online = true;
     me._processOfflineForms();
 }
 
-DataAcquisitionApplication.prototype._setOffline = function() { 
+DataAcquisitionApplication.prototype._setOffline = function() {
     me._online = false;
 }
 
@@ -289,20 +273,9 @@ DataAcquisitionApplication.prototype._setOffline = function() {
 DataAcquisitionApplication.prototype._processOfflineForms = function() {
 
 
-    var me=this;
+    var me = this;
 
-
-    var savepath = fs.knownFolders.documents().path;
-    var folder = fs.Folder.fromPath(savepath);
-    var list = [];
-    folder.eachEntity(function(f) {
-        //console.log(typeof f.toString());
-        var path = f.path.toString();
-        if (path.indexOf('data.json') > 0) {
-            console.log('process: ' + path);
-            list.push(path);
-        }
-    });
+    var list = me._offlineFormPaths();
 
     console.log('Process Offline Forms: ' + list.length);
 
@@ -325,11 +298,72 @@ DataAcquisitionApplication.prototype._processOfflineForms = function() {
     }
 
 };
+DataAcquisitionApplication.prototype._offlineFormPaths = function() {
+
+
+    var me = this;
+
+
+    var savepath = fs.knownFolders.documents().path;
+    var folder = fs.Folder.fromPath(savepath);
+    var list = [];
+    folder.eachEntity(function(f) {
+        //console.log(typeof f.toString());
+        var path = f.path.toString();
+        if (path.indexOf('data.json') > 0) {
+            console.log('process: ' + path);
+            list.push(path);
+        }
+    });
+
+    return list;
+
+};
+
+DataAcquisitionApplication.prototype.getQueuedForms = function() {
+
+    var me = this;
+
+    return new Promise(function(resolve, reject) {
+
+        var paths = me._offlineFormPaths();
+
+        if (paths.length == 0) {
+            resolve([]);
+            return;
+        }
+
+        var errors = 0;
+        var forms = [];
+
+        var check = function() {
+            if (errors + forms.length == paths.length) {
+                resolve(forms);
+            }
+        }
+
+        paths.forEach(function(path) {
+            me._getFormFileData(path).then(function(data) {
+
+                forms.push(data);
+                check();
+
+
+            }).catch(function(err) {
+                console.log('getQueuedForms Error');
+                errors++;
+                check();
+            })
+        })
+
+
+    });
+}
 
 
 DataAcquisitionApplication.prototype._processFormFile = function(filename, countItems, callback) {
 
-    var me=this;
+    var me = this;
 
     var savepath = fs.knownFolders.documents().path;
     var filepath = fs.path.join(savepath, filename);
@@ -339,9 +373,41 @@ DataAcquisitionApplication.prototype._processFormFile = function(filename, count
 }
 
 
+DataAcquisitionApplication.prototype._getFormFileData = function(filepath) {
+
+    var me = this;
+
+    console.log('Read Form File Json: ' + filepath);
+
+    return new Promise(function(resolve, reject) {
+
+        var file = fs.File.fromPath(filepath);
+
+        file.readText().then(function(content) {
+            var data = JSON.parse(content);
+            data._path = filepath;
+            data._lastModified = file.lastModified;
+            data._tz = (new Date()).getTimezoneOffset()
+
+            if (!data._formName) {
+                data._formName = 'default';
+            }
+
+            resolve(data);
+        }).catch(function(err) {
+            console.log('Form File Read Error => ' + err);
+            reject(err);
+        });
+
+    });
+
+
+
+}
+
 DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, countItems, callback) {
 
-     var me=this;
+    var me = this;
 
 
     console.log('Process Form File: ' + filepath);
@@ -349,7 +415,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
     var file = fs.File.fromPath(filepath);
 
 
-    var mediaFields=['media', 'media-audio', 'media-video', 'media-image']
+    var mediaFields = ['media', 'media-audio', 'media-video', 'media-image']
 
     file.readText().then(function(content) {
 
@@ -358,14 +424,14 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
         console.log('Read: ' + content)
 
-        var media=[];
-        mediaFields.forEach(function(field){
-            if(data[field]){
-                media=media.concat(data[field]);
+        var media = [];
+        mediaFields.forEach(function(field) {
+            if (data[field]) {
+                media = media.concat(data[field]);
             }
         })
 
-       
+
         var mediaItems = mediaItemsThatNeedUploading(media);
         if (mediaItems.length) {
             if (!countItems) {
@@ -373,7 +439,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
             }
             console.log("There are " + mediaItems.length + " items to upload: list:" + JSON.stringify(mediaItems, null, "  "));
 
-            uploadMediaItem(mediaItems[0], countItems - mediaItems.length, countItems).then(function() {
+            me.uploadMediaItem(mediaItems[0], countItems - mediaItems.length, countItems).then(function() {
                 //recursive call will upload all mediaItems until done...
                 console.log(mediaItemsThatNeedUploading(media).length + " items to upload");
                 me._processFormFilePath(filepath, countItems, callback);
@@ -391,13 +457,40 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
         console.log('About to save marker');
         console.log(JSON.stringify(data));
+        
+        data["media-metadata-set"]=media.map(function(item) {
+            return mediaData(item);
+        });
+
+        data["media-urls"]=media.map(function(item) {
+            var preffered='url';
+            var alsoPushTo=null;
+            if(item.type){
+               preffered=item.type;
+               var alsoPushToKey='media-'+preffered+'s';
+                
+                if(!data[alsoPushToKey]){
+                    data[alsoPushToKey]=[];
+                    alsoPushTo=data[alsoPushToKey];
+                }
+
+            }
+            var meta=mediaData(item);
+            var url=meta[preffered]||meta.url||meta.image||meta.video||meta.audio||meta.document;
+            if(alsoPushTo){
+                alsoPushTo.push(url);
+            }
+            return url;
+        });
+
+
         data.description = (data.description ? data.description : "") + media.map(function(item) {
             return mediaData(item).html;
         }).join("");
-        instance._sumbitFeature(data, function(err) {
+        me._submitData(data, function(err) {
 
             if (!err) {
-                file.remove()
+                file.remove();
             }
 
             callback(err);
@@ -407,7 +500,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 
     }).catch(function(err) {
-        console.log('Form Error => ' + err);
+        console.log('Form File Read Error => ' + err);
         callback(err);
     });
 
@@ -416,13 +509,24 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 var mediaItemsThatNeedUploading = function(fileArray) {
     return fileArray.filter(function(mediaFile) {
-        return !hasUrlForMedia(mediaFile);
+        return hasFileForMedia(mediaFile)&&(!hasUrlForMedia(mediaFile));
     });
 }
 var mediaData = function(filename) {
+
     var fileMetaName = filename + '.json';
-    fileMetaName=fileMetaName.split('/').pop()
+    fileMetaName = fileMetaName.split('/').pop()
     var file = fs.File.fromPath(fs.path.join(fs.knownFolders.documents().path, fileMetaName));
+
+
+    if(!fs.File.exists(filename)){
+        //should only be here if filename is an actual url!
+        return {
+            "image":filename,
+            "type":"image",
+            "html":"<img src=\""+filename+"\" />"
+        };
+    }
 
     // Writing text to the file.
     var data = file.readTextSync(function(err) {
@@ -443,53 +547,48 @@ var mediaData = function(filename) {
 
 
 
-var uploadMediaItem = function(filename, finished, total) {
+DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finished, total) {
 
-   return instance.uploadMediaItem(filename, finished, total)
-};
-
-
-DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished, total){
-
-    var me=this;
+    var me = this;
 
     var savepath = fs.knownFolders.documents().path;
-    var filePath = filename[0]=='/'?filename:fs.path.join(savepath, filename);
+    var filePath = filename[0] == '/' ? filename : fs.path.join(savepath, filename);
 
-    filename=filename.split('/').pop();
+    filename = filename.split('/').pop();
 
 
     var file = fs.File.fromPath(filePath);
 
     if (!fs.File.exists(filePath)) {
+
         throw "File does not exist!!";
     }
 
 
-    var type="image_upload";
+    var type = "image_upload";
 
-    if(filename.indexOf(".mp3")>0||filename.indexOf(".m4a")>0){
-        type="audio_upload";
+    if (filename.indexOf(".mp3") > 0 || filename.indexOf(".m4a") > 0) {
+        type = "audio_upload";
     }
 
-    if(filename.indexOf(".mp4")>0){
-        type="video_upload";
+    if (filename.indexOf(".mp4") > 0) {
+        type = "video_upload";
     }
 
 
-    var url = 'https://' + global.client.getUrl()+ "/" + global.client.getPathForTask(type) + "&json=%7B%7D"; 
+    var url = global.client.getProtocol() + '://' + global.client.getUrl() + "/" + global.client.getPathForTask(type) + "&json=%7B%7D";
     var method = "POST";
 
     console.log('Initiating Background Upload: ' + filename);
     console.log('Post Background ' + method + ': ' + url);
     console.log('File Exists! ' + filename + " " + file.extension + " " + file.lastModified);
 
-    if( type=="video_upload"){
-       file.readText().then(function(text){
-        console.log("Video: "+text);
-       })
+    if (type == "video_upload") {
+        file.readText().then(function(text) {
+            console.log("Video: " + text);
+        })
     }
-    
+
     var session = bghttp.session("media-upload");
 
     var request = {
@@ -499,13 +598,13 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
             "Content-Type": "application/octet-stream",
             "File-Name": filename
         },
-        description: "{ 'uploading': "+filename+" }"
+        description: "{ 'uploading': " + filename + " }"
     };
 
 
     console.log('Generating Promise');
 
-    console.log("about to upload: "+filePath);
+    console.log("about to upload: " + filePath);
     var task = session.uploadFile(filePath, request);
 
     return new Promise(function(resolve, reject) {
@@ -532,7 +631,7 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
 
         task.on("responded", function(response) {
 
-            console.log('Response: ' + response.data+" "+url);
+            console.log('Response: ' + response.data + " " + url);
             var fileMeta = JSON.parse(response.data);
 
 
@@ -558,10 +657,23 @@ DataAcquisitionApplication.prototype.uploadMediaItem=function(filename, finished
 var hasUrlForMedia = function(filename) {
 
 
-    filename=filename.split('/').pop();
+    var name = filename.split('/').pop();
 
     var documents = fs.knownFolders.documents();
-    var filePath = fs.path.join(documents.path, filename) + '.json';
+    var filePath = fs.path.join(documents.path, name) + '.json';
+    return fs.File.exists(filePath);
+
+}
+
+var hasFileForMedia = function(filename) {
+
+    if(fs.File.exists(filename)){
+        return true;
+    }
+
+    var name = filename.split('/').pop();
+    var documents = fs.knownFolders.documents();
+    var filePath = fs.path.join(documents.path, name);;
     return fs.File.exists(filePath);
 
 }
@@ -596,102 +708,22 @@ global.storeImageSource = function(imageAsset) {
 
 
 };
-var formData = {};
-var subFormsNames = [];
-var subFormsCallbacks = {};
-global.getSubformName = function() {
 
-    if (subFormsNames.length === 0) {
-        return 'root';
+
+
+DataAcquisitionApplication.prototype.submitForm = function(formData, formName, callback) {
+
+    var me = this;
+
+    var callbackData = {
+        isSubmitting: false,
+        submittingStateLabel: ""
     }
-
-    var name = subFormsNames[subFormsNames.length - 1];
-    return name;
-}
-global.popSubform = function() {
-
-
-
-    var name = subFormsNames[subFormsNames.length - 1];
-    console.log('Pop Subform: ' + name);
-    if (subFormsCallbacks[name]) {
-        subFormsCallbacks[name](getFormData());
-        delete subFormsCallbacks[name];
-    }
-
-    subFormsNames.pop();
-
-}
-global.pushSubform = function(name, callback) {
-    console.log('Push Subform: ' + name)
-    subFormsNames.push(name);
-
-    if (callback) {
-        subFormsCallbacks[name] = callback;
-    }
-}
-
-
-global.setFormData = function(data) {
-    var form = formData;
-
-    subFormsNames.forEach(function(s) {
-        if (!form[s]) {
-            form[s] = {};
-
-        }
-        form = form[s];
-    });
-
-
-
-    Object.keys(data).forEach(function(k) {
-        form[k] = data[k];
-    });
-    console.log('Set Form Data for: ' + global.getSubformName() + ': ' + JSON.stringify(form));
-
-}
-global.getFormData = function() {
-    return instance.getFormData();
-}
-DataAcquisitionApplication.prototype.getFormData = function() {
-    var form = formData;
-
-    subFormsNames.forEach(function(s) {
-        if (!form[s]) {
-            form[s] = {};
-
-        }
-        form = form[s];
-    });
-    var data = {};
-    Object.keys(form).forEach(function(k) {
-        if (k.indexOf('_') === 0) {
-            return;
-        }
-        data[k] = form[k];
-    });
-    return JSON.parse(JSON.stringify(data)); //remove any references
-}
-
-global.submitForm = function(callback) {
-    return instance.submitForm(callback);
-}
-DataAcquisitionApplication.prototype.submitForm = function(callback) {
-
-    var me=this;
-
-    var data = global.getFormData();
-    formData = {};
-    var callbackData={
-        isSubmitting:false,
-        submittingStateLabel:""
-    }
-    global.storeFormJson(data).then(function(file) {
+    me._storeFormJson(formData, formName).then(function(file) {
         if (me.isOnline()) {
             me._processFormFile(file, null, function(err) {
                 if (err) {
-                    
+
 
                     var eventData = {
                         eventName: "submitFormFailed",
@@ -729,10 +761,10 @@ DataAcquisitionApplication.prototype.submitForm = function(callback) {
         clearHistory: true,
         //backstackVisible:false,
         context: {
-            form: require('../').Configuration.SharedInstance().get("mainView","menu"),
-            data:{
-                isSubmitting:true,
-                submittingStateLabel:"Uploading"
+            form: require('../').Configuration.SharedInstance().get("mainView", "menu"),
+            data: {
+                isSubmitting: true,
+                submittingStateLabel: "Uploading"
             }
         }
     });
@@ -743,13 +775,16 @@ var generateMarkerFileName = function() {
     return global.parameters.domain + '.' + new Date().getTime() + '.data.json';
 }
 
-global.storeFormJson = function(data) {
+DataAcquisitionApplication.prototype._storeFormJson = function(data, name) {
 
     return new Promise(function(resolve, reject) {
 
         var savepath = fs.knownFolders.documents().path;
         var filename = generateMarkerFileName();
         var filepath = fs.path.join(savepath, filename);
+
+        data._createdDate = new Date().getTime();
+        data._formName = name;
 
         var file = fs.File.fromPath(filepath);
 

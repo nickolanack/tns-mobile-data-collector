@@ -12,6 +12,7 @@ module.exports={
 	MapViewRenderer:require('./src/MapViewRenderer'),
 	ListViewRenderer:require('./src/ListViewRenderer'),
 	HtmlParser:require('./src/HtmlParser'),
-	Template:require('./src/Template.js')
+	Template:require('./src/Template.js'),
+	ARViewRenderer:require('./src/ARViewRenderer.js'),
 
 };

@@ -2,8 +2,14 @@ var dialogs;
 var Pusher;
 var IPublicChannelEventListener;
 
+var loaded=false;
+
 function Messages(params) {
 
+	if(loaded){
+		throw 'Should be singleton';
+	}
+	loaded=true;
 
 	dialogs = require("ui/dialogs");
 	Pusher = require("pusher-nativescript").Pusher;
@@ -19,7 +25,10 @@ function Messages(params) {
 	pusher.connect().then(() => {
 	  // Connected successfully
 	}).catch(error => {
-	  // Handling connection errors
+	  console.log("Pusher Error Connect:"+JSON.stringify({
+	  	"pusherAppChannelPrefix":params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.',
+	  	"pusherAppKey":params.pusherAppKey
+	  }));
 	  console.log(error);
 	});
 	 
@@ -80,7 +89,7 @@ Messages.prototype.subscribe = function(channel, event, callback) {
 	me.pusher.subscribe(channelTypeAndName, eventName, publicChannelEventsListeners).then(() => {
 	  console.log('Channel subscription and event binding succeeded');
 	}).catch(error => {
-	  // Some errors have occurred when subscribing and/or binding the event
+	  console.log("Pusher Error Subscribe");
 	  console.log(error);
 	})
 	 
@@ -100,6 +109,25 @@ Messages.prototype.alert = function(args) {
 	});
 
 };
+
+Messages.prototype.confirm = function(args) {
+
+	console.log('okButtonText: '+(typeof args.okButtonText));
+	if((typeof args.okButtonText)=='undefined'){
+		args.okButtonText='Yes';
+	}
+	if((typeof args.cancelButtonText)=='undefined'){
+		args.cancelButtonText='No';
+	}
+
+
+	return dialogs.confirm(args).then(function(result) {
+		console.log("Dialog closed!: "+result);
+		return result;
+	});
+
+};
+
 
 
 module.exports = Messages;

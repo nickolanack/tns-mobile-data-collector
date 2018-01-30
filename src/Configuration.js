@@ -430,7 +430,7 @@ Configuration.prototype.getIcon = function(name, urlPath) {
 
 		var url = me._formatUrl(urlPath) + "?thumb=128x128";
 		if(url.indexOf('http')!==0){
-			url="https://" + me.client.getUrl() + '/' + url;
+			url=me.client.getProtocol()+"://" + me.client.getUrl() + '/' + url;
 		}
 
 		// Try to read the image from the cache
@@ -500,7 +500,7 @@ Configuration.prototype.getImage = function(name, urlPath) {
 
 		var url = me._formatUrl(urlPath);
 		if(url.indexOf('http')!==0){
-			url="https://" + me.client.getUrl() + '/' + url;
+			url=me.client.getProtocol()+"://" + me.client.getUrl() + '/' + url;
 		}
 		// Try to read the image from the cache
 
@@ -544,6 +544,8 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 	var me = this;
 
 
+	console.log("Request Style: "+name);
+
 	var getLocalStylePromise = function() {
 		var path = stylePath(name);
 		return new Promise(function(resolve, reject) {
@@ -574,7 +576,7 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 
 		var url =me._formatUrl(urlPath);
 		if(url.indexOf('http')!==0){
-			 url="https://" + me.client.getUrl() + '/' + url;
+			 url=me.client.getProtocol()+"://" + me.client.getUrl() + '/' + url;
 		}
 		// Try to read the stylesheet from the cache
 		console.log("stylesheet: " + url);

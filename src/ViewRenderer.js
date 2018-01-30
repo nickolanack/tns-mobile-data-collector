@@ -27,9 +27,11 @@ var utilityModule;
 
 var instance;
 
+var SocialShare;
+var PullToRefresh;
+
 
 function ViewRenderer() {
-
 
 	var me = this;
 
@@ -50,7 +52,9 @@ function ViewRenderer() {
 	frameModule = require("ui/frame");
 	progressModule = require("ui/progress");
 	utilityModule = require("utils/utils");
+	SocialShare = require("nativescript-social-share");
 
+	PullToRefresh = require("nativescript-pulltorefresh").PullToRefresh
 
 	if (instance) {
 		throw 'Singleton class instance has already been created! use ViewRenderer.SharedInstance()';
@@ -59,7 +63,6 @@ function ViewRenderer() {
 
 
 };
-
 
 
 
@@ -93,6 +96,19 @@ ViewRenderer.prototype.currentView = function() {
 };
 
 
+/**
+ * Default style (url) applied to all views rendered
+ */
+ViewRenderer.prototype.setDefaultStyle=function(styleUrl){
+	this._styleUrl=styleUrl;
+}
+
+ViewRenderer.prototype._renderDefaultStyle=function(){
+	if(this._styleUrl){
+		this.renderStyle(this._styleUrl);
+	}
+}
+
 
 ViewRenderer.prototype._app = function() {
 	return require('tns-mobile-data-collector').DataAcquisitionApplication.SharedInstance();
@@ -118,25 +134,25 @@ ViewRenderer.prototype._getParser = function() {
 	}
 	return me._template;
 }
-ViewRenderer.prototype._parse = function(str, template, params) {
+ViewRenderer.prototype._parse = function(template, formatter, params) {
 
 
 	var me = this;
 
-	if(!params){
+	if (!params) {
 		params = me._params();
 	}
-	
-	return me._getParser().render(str, params, template);
+
+	return me._getParser().render(template, params, formatter);
 
 }
 
 ViewRenderer.prototype._params = function(model) {
 
-	var me=this;
+	var me = this;
 
 	var params = JSON.parse(JSON.stringify(me._config().getDefaultParameters()));
-	params.data = JSON.parse(JSON.stringify(me.getCurrentFormData(model)));
+	params.data = JSON.parse(JSON.stringify(me.getCurrentViewData(model)));
 	return params;
 
 }
@@ -160,7 +176,7 @@ ViewRenderer.prototype._hasFormDataTemplate = function(str) {
 }
 
 ViewRenderer.prototype._shouldBindToData = function(str) {
-	var me=this;
+	var me = this;
 	if (me._hasFormDataTemplate(str) || me._getParser().hasTemporalFormatter(str)) {
 		return true;
 	}
@@ -169,21 +185,21 @@ ViewRenderer.prototype._shouldBindToData = function(str) {
 ViewRenderer.prototype._bindToDataChangeEvents = function(str, callback) {
 
 	var me = this;
-	var model=me._model;
+	var model = me._model;
 
 
 
-	if(me._hasFormDataTemplate(str)){		
+	if (me._hasFormDataTemplate(str)) {
 
 		me._addUpdateEventListener(str, function(data) {
 			callback(me._parse(str, null, me._params(model)));
 		})
 
 	}
-	
-	if(me._getParser().hasTemporalFormatter(str)){
-		me._addUpdateInterval(str, function(){
-			var val=me._parse(str, null, me._params(model));
+
+	if (me._getParser().hasTemporalFormatter(str)) {
+		me._addUpdateInterval(str, function() {
+			var val = me._parse(str, null, me._params(model));
 			//onsole.log('Update temporally bound item: '+val);
 			callback(val);
 		}, 1000);
@@ -191,68 +207,68 @@ ViewRenderer.prototype._bindToDataChangeEvents = function(str, callback) {
 
 }
 
-ViewRenderer.prototype._addUpdateEventListener=function(str, eventFn){
-	var me=this;
-	var model=me._model;
+ViewRenderer.prototype._addUpdateEventListener = function(str, eventFn) {
+	var me = this;
+	var model = me._model;
 	model.on(require("data/observable").Observable.propertyChangeEvent, eventFn);
 
-	if(!me._eventListeners){
-		me._eventListeners=[];
+	if (!me._eventListeners) {
+		me._eventListeners = [];
 	}
 	me._eventListeners.push(eventFn);
 
 }
 
-ViewRenderer.prototype._removeEventListeners=function(list){
-	var me=this;
+ViewRenderer.prototype._removeEventListeners = function(list) {
+	var me = this;
 	console.log('Clear Events');
-	var events=(list||me._eventListeners||[]);
-	events.forEach(function(eventFn){
+	var events = (list || me._eventListeners || []);
+	events.forEach(function(eventFn) {
 		me._model.removeEventListener(require("data/observable").Observable.propertyChangeEvent, eventFn);
 	});
 
-	if(list&&me._eventListeners){
-		list.forEach(function(e){
-			var i=me._eventListeners.indexOf(e);
-			if(i>=0){
-				me._eventListeners.splice(i,1);
+	if (list && me._eventListeners) {
+		list.forEach(function(e) {
+			var i = me._eventListeners.indexOf(e);
+			if (i >= 0) {
+				me._eventListeners.splice(i, 1);
 			}
 		})
-	}else{
-		me._eventListeners=[];
+	} else {
+		me._eventListeners = [];
 	}
 
 }
 
 
-ViewRenderer.prototype._watchEventBindings=function(fn){
+ViewRenderer.prototype._watchEventBindings = function(fn) {
 
-	var me=this;
-	var l=0;
-	if(me._eventListeners){
-		l=me._eventListeners.length;
+	var me = this;
+	var l = 0;
+	if (me._eventListeners) {
+		l = me._eventListeners.length;
 	}
 
 	fn();
 
-	if(me._eventListeners){
+	if (me._eventListeners) {
 		return me._eventListeners.slice(l);
 	}
 	return [];
 
 }
 
-ViewRenderer.prototype._watchIntervalBindings=function(fn){
+ViewRenderer.prototype._watchIntervalBindings = function(fn) {
 
-	var me=this;
-	var l=0;
-	if(me._intervals){
-		l=me._intervals.length;
+	var me = this;
+	var l = 0;
+	if (me._intervals) {
+		l = me._intervals.length;
 	}
 
 	fn();
 
-	if(me._intervals){
+	if (me._intervals) {
 		return me._intervals.slice(l);
 	}
 	return [];
@@ -261,45 +277,45 @@ ViewRenderer.prototype._watchIntervalBindings=function(fn){
 
 
 
-ViewRenderer.prototype._addUpdateInterval=function(name, fn, time){
-	var me=this;
-	var interval=setInterval(fn, time);
+ViewRenderer.prototype._addUpdateInterval = function(name, fn, time) {
+	var me = this;
+	var interval = setInterval(fn, time);
 
 	/**
 	 * TODO: manage intervals gracefully on page transistions.
 	 */
-	
-	if(!me._intervals){
-		me._intervals=[];
+
+	if (!me._intervals) {
+		me._intervals = [];
 	}
 
 	me._intervals.push([name, interval, fn, time]);
 
 }
 
-ViewRenderer.prototype._clearUpdateIntervals=function(list){
-	var me=this;
+ViewRenderer.prototype._clearUpdateIntervals = function(list) {
+	var me = this;
 	console.log('Clear Update Intevals');
 
-	var intervals=list||me._intervals||[];
+	var intervals = list || me._intervals || [];
 
-	if(me._intervals){
-		me._intervals.forEach(function(item){
-			console.log('Clear: '+item[0]+' '+item[2].toString());
+	if (me._intervals) {
+		me._intervals.forEach(function(item) {
+			console.log('Clear: ' + item[0] + ' ' + item[2].toString());
 			clearInterval(item[1]);
 		});
 	}
 
 
-	if(list&&me._intervals){
-		list.forEach(function(e){
-			var i=me._intervals.indexOf(e);
-			if(i>=0){
-				me._intervals.splice(i,1);
+	if (list && me._intervals) {
+		list.forEach(function(e) {
+			var i = me._intervals.indexOf(e);
+			if (i >= 0) {
+				me._intervals.splice(i, 1);
 			}
 		})
-	}else{
-		me._intervals=[];
+	} else {
+		me._intervals = [];
 	}
 }
 
@@ -314,8 +330,8 @@ ViewRenderer.prototype._addDataChangeEvents = function(str, callback) {
 
 
 ViewRenderer.prototype._addStyle = function(el, field) {
-	if(el&&field&&field.style){
-		el.style=field.style;
+	if (el && field && field.style) {
+		el.style = field.style;
 	}
 
 
@@ -329,65 +345,65 @@ ViewRenderer.prototype._addStyle = function(el, field) {
 ViewRenderer.prototype._addClass = function(el, className) {
 
 
-	var me=this;
+	var me = this;
 
-	if(el&&className&&className!==""){
+	if (el && className && className !== "") {
 
-		if(typeof className !="string"){
-			if(!className.className){
+		if (typeof className != "string") {
+			if (!className.className) {
 				return;
 			}
-			className=className.className;
+			className = className.className;
 		}
 
 
 
-		var last=[];
+		var last = [];
 		me._bind(className, function(value) {
 
-			var current=me._arrayUnique(value.split(' '));
+			var current = me._arrayUnique(value.split(' '));
 
-			if(last.length){
-				var diff=me._arrayDiff(last, current);
-				console.log("Removing Classname Diff: "+JSON.stringify(last)+' '+JSON.stringify(current)+' -> '+JSON.stringify(diff));
+			if (last.length) {
+				var diff = me._arrayDiff(last, current);
+				console.log("Removing Classname Diff: " + JSON.stringify(last) + ' ' + JSON.stringify(current) + ' -> ' + JSON.stringify(diff));
 				me._removeClass(el, diff);
 			}
-			
-			last=current;
-			
 
-			var classNames=me._arrayUnique(el.className?el.className.split(' '):[]);
-			el.className=me._arrayJoin(classNames, current).join(' ');
+			last = current;
+
+
+			var classNames = me._arrayUnique(el.className ? el.className.split(' ') : []);
+			el.className = me._arrayJoin(classNames, current).join(' ');
 
 		});
-		
+
 	}
 
 
 }
 
 
-ViewRenderer.prototype._arrayDiff=function(a, b){
+ViewRenderer.prototype._arrayDiff = function(a, b) {
 
-	return a.filter(function(item){
-		return b.indexOf(item)<0;
+	return a.filter(function(item) {
+		return b.indexOf(item) < 0;
 	})
 
 }
-ViewRenderer.prototype._arrayJoin=function(a, b){
+ViewRenderer.prototype._arrayJoin = function(a, b) {
 
-	return a.concat(b.filter(function(item){
-		return a.indexOf(item)<0;
+	return a.concat(b.filter(function(item) {
+		return a.indexOf(item) < 0;
 	}))
 
 }
 
-ViewRenderer.prototype._arrayUnique=function(a){
+ViewRenderer.prototype._arrayUnique = function(a) {
 
-	var o={};
-	a.forEach(function(item){
-		if(item&&item!=''){
-			o[item]='';
+	var o = {};
+	a.forEach(function(item) {
+		if (item && item != '') {
+			o[item] = '';
 		}
 	});
 	return Object.keys(o);
@@ -398,74 +414,73 @@ ViewRenderer.prototype._arrayUnique=function(a){
 ViewRenderer.prototype._addEnabled = function(el, enabled) {
 
 
-	var me=this;
+	var me = this;
 
-		console.log('Check Enabled!')
+	console.log('Check Enabled!')
 
 
-		if(typeof enabled !="boolean"||typeof enabled !="string"){
-			if(!enabled.enabled){
-				return;
-			}
-			enabled=enabled.enabled;
+	if (typeof enabled != "boolean" || typeof enabled != "string") {
+		if (!enabled.enabled) {
+			return;
+		}
+		enabled = enabled.enabled;
+	}
+
+
+
+	me._bind(enabled, function(v) {
+
+		var value = !!v;
+		console.log('Set Enabled! ' + (value ? "true" : "false"));
+		if (v) {
+			me._removeClass(el, 'disabled');
+		} else {
+			me._addClass(el, 'disabled');
 		}
 
+		el.isEnabled = !!value;
+
+	});
 
 
-	
-		me._bind(enabled, function(v) {
-
-			var value=!!v;
-			console.log('Set Enabled! '+(value?"true":"false"));
-			if(v){
-				me._removeClass(el, 'disabled');
-			}else{
-				me._addClass(el,'disabled');
-			}
-
-			el.isEnabled=!!value;
-
-		});
-		
-	
 
 }
 
-var _isArray=function(thing){
+var _isArray = function(thing) {
 	return Object.prototype.toString.call(thing) === "[object Array]";
 }
-var _isObject=function(thing){
+var _isObject = function(thing) {
 	return Object.prototype.toString.call(thing) === "[object Object]";
 }
 
 ViewRenderer.prototype._removeClass = function(el, className) {
 
-	var me=this;
-	if(_isArray(className)){
-		console.log('Remove Class Names Array: '+JSON.stringify(className));
-		className.forEach(function(c){
+	var me = this;
+	if (_isArray(className)) {
+		console.log('Remove Class Names Array: ' + JSON.stringify(className));
+		className.forEach(function(c) {
 			me._removeClass(el, c);
 		})
 		return;
 	}
 
 
-	if(el&&className&&className!==""){
+	if (el && className && className !== "") {
 
-		if(typeof className !="string"){
-			if(!className.className){
+		if (typeof className != "string") {
+			if (!className.className) {
 				return;
 			}
-			className=className.className;
+			className = className.className;
 		}
 
-		console.log('Remove Class: `'+className+'`');
+		console.log('Remove Class: `' + className + '`');
 
-		var classNames=(el.className?el.className:"").split(' ');
-		var index=classNames.indexOf(className)
-		if(index>=0){
-			classNames.splice(index,1);
-			el.className=classNames.join(' ');
+		var classNames = (el.className ? el.className : "").split(' ');
+		var index = classNames.indexOf(className)
+		if (index >= 0) {
+			classNames.splice(index, 1);
+			el.className = classNames.join(' ');
 		}
 	}
 
@@ -480,10 +495,10 @@ var renderHeading = function(container, field) {
 
 ViewRenderer.prototype.renderHeading = function(container, field) {
 
-	var me=this;
-	var label=me.renderText(container, field);
+	var me = this;
+	var label = me.renderText(container, field);
 	me._addClass(label, "heading");
-	
+
 	return label;
 
 }
@@ -492,9 +507,9 @@ var renderLabel = function(container, field) {
 	return instance.renderLabel(container, field);
 }
 ViewRenderer.prototype.renderLabel = function(container, field) {
-	
-	var me=this;
-	var label=me.renderText(container, field);
+
+	var me = this;
+	var label = me.renderText(container, field);
 	me._addClass(label, "label");
 	return label;
 
@@ -520,63 +535,82 @@ ViewRenderer.prototype._createText = function(field) {
 
 	label.textWrap = true;
 
-	
+
 	return label;
 }
 
 
+ViewRenderer.prototype._getARViewRenderer = function(container, field) {
+	var me = this;
+	if (!me._arViewRenderer) {
+		var ARViewRenderer = require('../').ARViewRenderer
+		me._arViewRenderer = new ARViewRenderer();
+	}
+	return me._arViewRenderer;
+}
+
+
+ViewRenderer.prototype.renderARView = function(container, field) {
+
+	var me = this;
+	return me._getARViewRenderer().renderARView(container, field);
+}
+
+
+
+
 ViewRenderer.prototype._getMediaViewRenderer = function(container, field) {
-	var me=this;
-	if(!me._mediaViewRenderer){
+	var me = this;
+	if (!me._mediaViewRenderer) {
 		var MediaViewRenderer = require('../').MediaViewRenderer
-		me._mediaViewRenderer=new MediaViewRenderer();
+		me._mediaViewRenderer = new MediaViewRenderer();
 	}
 	return me._mediaViewRenderer;
 }
 
 ViewRenderer.prototype._getMapViewRenderer = function(container, field) {
-	var me=this;
-	if(!me._mapViewRenderer){
+	var me = this;
+	if (!me._mapViewRenderer) {
 		var MapViewRenderer = require('../').MapViewRenderer
-		me._mapViewRenderer=new MapViewRenderer();
+		me._mapViewRenderer = new MapViewRenderer();
 	}
 	return me._mapViewRenderer;
 }
 
 ViewRenderer.prototype.renderVideoPlayer = function(container, field) {
 
-	var me=this;
+	var me = this;
 	return me._getMediaViewRenderer().renderVideoPlayer(container, field);
 }
 
 ViewRenderer.prototype.renderInlineVideoPlayer = function(container, field) {
 
-	var me=this;
+	var me = this;
 	return me._getMediaViewRenderer().renderInlineVideoPlayer(container, field);
 }
 
 
 ViewRenderer.prototype.renderAudioPlayer = function(container, field) {
 
-	var me=this;
+	var me = this;
 	return me._getMediaViewRenderer().renderAudioPlayer(container, field);
 }
 
 
 ViewRenderer.prototype.renderMediaPicker = function(container, field) {
-	var me=this;
+	var me = this;
 	return me._getMediaViewRenderer().renderMediaPicker(container, field);
 }
 
 
 ViewRenderer.prototype.renderAudioRecorder = function(container, field) {
-	var me=this;
+	var me = this;
 	return me._getMediaViewRenderer().renderAudioRecorder(container, field);
 }
 
 
-ViewRenderer.prototype.renderMap= function(container, field) {
-	var me=this;
+ViewRenderer.prototype.renderMap = function(container, field) {
+	var me = this;
 	return me._getMapViewRenderer().renderMap(container, field);
 }
 
@@ -595,7 +629,7 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 
 	var me = this;
 
-	var model=me._model;
+	var model = me._model;
 	if (field.field) {
 		console.log('Render location field');
 		model.set(field.name, [0, 0]);
@@ -612,7 +646,7 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 
 				if (loc) {
 					console.log("Current location is: " + JSON.stringify(loc));
-					model.set(field.name, [loc.latitude, loc.longitude]);
+					model.set(field.name, [loc.latitude, loc.longitude, loc.altitude]);
 				}
 
 			},
@@ -647,7 +681,7 @@ ViewRenderer.prototype.back = function(num) {
 	var me = this;
 
 	var topmost = frameModule.topmost();
-	global.setFormData(me.getCurrentFormData());
+	me._setFormData(me.getCurrentViewData());
 	me._popSubform();
 
 
@@ -659,28 +693,32 @@ ViewRenderer.prototype.back = function(num) {
 	}
 }
 
+ViewRenderer.prototype.setSubmitHandler = function(handler) {
+	this._submitHandler=handler;
+}
 
 ViewRenderer.prototype.submit = function(num) {
 
 	var me = this;
 
-	global.setFormData(me.getCurrentFormData());
+	me._setFormData(me.getCurrentViewData());
 
 	var n = num || 0;
 	while (n > 0) {
 		me._popSubform();
-		global.setFormData(me.getCurrentFormData());
+		me._setFormData(me.getCurrentViewData());
 		n--;
 	}
 
 
-	global.submitForm(function(data){
+	me._submitHandler(me.getFormData(), me.currentView(), function(data) {
+
+		submittableFormData={};
+
 		console.log('set form data after submit');
-		Object.keys(data).forEach(function(k){
+		Object.keys(data).forEach(function(k) {
 			me._model.set(k, data[k]);
 		});
-
-		
 	});
 }
 
@@ -689,7 +727,7 @@ ViewRenderer.prototype.cancel = function() {
 	var me = this;
 
 	var topmost = frameModule.topmost();
-	//global.setFormData(me.getCurrentFormData());
+	//global.setFormData(me.getCurrentViewData());
 	me._popSubform();
 	console.log('Cancel');
 
@@ -705,6 +743,8 @@ var renderTextField = function(container, field, model) {
 
 	var textfield = new textFieldModule.TextField();
 
+	textfield.returnKeyType='done';
+
 	textfield.hint = field.placeholder;
 
 	instance._addClass(textfield, "textfield")
@@ -715,7 +755,7 @@ var renderTextField = function(container, field, model) {
 	}
 
 	textfield.bind(bindingOptions, model);
-	model.set(field.name, "");
+	model.set(field.name, model.get(field.name)||"");
 
 	container.addChild(textfield);
 
@@ -796,13 +836,13 @@ ViewRenderer.prototype.renderButton = function(container, field) {
 	if (field.action) {
 
 		console.log('Apply Tap');
-		//me.applyTapAction(stackLayout, field, model); //already done by renderImage
-		me.applyTapAction(button, field);
+		//me.addTapActionListener(stackLayout, field, model); //already done by renderImage
+		me.addTapActionListener(button, field);
 
 	} else {
 
 		console.log("There is no tap action for field: " + JSON.stringify(field, null, "   "));
-	
+
 	}
 
 	me._addClass(button, field);
@@ -842,7 +882,7 @@ var renderIconselect = function(container, field, model) {
 
 		getConfiguration().getIcon(icon.icon)
 
-		.then(function(imgPath) {
+			.then(function(imgPath) {
 
 				var image = new imageModule.Image();
 
@@ -887,22 +927,22 @@ var renderImage = function(container, field) {
 
 	var image = instance._createImage(field);
 
-	if(field.stretch){
+	if (field.stretch) {
 		image.stretch = field.stretch;
 	}
 
 	container.addChild(image);
 
-	if(field.action){
-		instance.applyTapAction(image, field);
+	if (field.action) {
+		instance.addTapActionListener(image, field);
 	}
 
 	instance._addClass(image, field);
 
 
 	var gestures = require("ui/gestures");
-	image.on(gestures.GestureTypes.pinch, function (args) {
-	    console.log("Pinch Scale: " + JSON.stringify(args));
+	image.on(gestures.GestureTypes.pinch, function(args) {
+		console.log("Pinch Scale: " + JSON.stringify(args));
 	});
 
 
@@ -913,83 +953,80 @@ var renderImage = function(container, field) {
 
 ViewRenderer.prototype._createImage = function(field) {
 
-	var me=this;
+	var me = this;
 
-	var url=field;
-	if(field.image){
-		url=field.image;
+	var url = field;
+	if (field.image) {
+		url = field.image;
 	}
 
 
 
-	if(typeof url =='function'){
-		url=url();
+	if (typeof url == 'function') {
+		url = url();
 	}
 
-	if(_isArray(url)&&url.length==1&&typeof url[0]=="string"){
-		url=url[0];
-	 }
+	if (_isArray(url) && url.length == 1 && typeof url[0] == "string") {
+		url = url[0];
+	}
 
-	if(me._isImageAsset(url)){
+	if (me._isImageAsset(url)) {
 		return me._imageFromImageAsset(url);
 	}
 
-	if(typeof url=='string'&&url.indexOf('{')>=0){
-		 url = me._parse(url);
-		 console.log('Variable Image: '+src);
+	if (typeof url == 'string' && url.indexOf('{') >= 0) {
+		url = me._parse(url);
+		console.log('Variable Image: ' + src);
 
-		 
+
 	}
 
-	if(_isArray(url)&&url.length==1&&typeof url[0]=="string"){
-		 	/**
-		 	 * support for using core-app imageset image which is always an array with image url at 0 (possibly multiple images...);
-		 	 * @type {[type]}
-		 	 */
-			url=url[0];
-		 }
+	if (_isArray(url) && url.length == 1 && typeof url[0] == "string") {
+		/**
+		 * support for using core-app imageset image which is always an array with image url at 0 (possibly multiple images...);
+		 * @type {[type]}
+		 */
+		url = url[0];
+	}
 
-	if(me._isLocalFileAsset(url)){
+	if (me._isLocalFileAsset(url)) {
 		return me._imageFromLocalFileAsset(url);
 	}
 
 
 	var src = url;
 
-	if(typeof src !="string"){
-		throw 'Expected image src to be a string '+src+(typeof src);
+	if (typeof src != "string") {
+		throw 'Expected image src to be a string ' + src + (typeof src);
 	}
-		
-		
+
 
 
 	if (src[0] !== "~") {
-		src = 'https://' + global.client.getUrl() + "/" + src;
+		src = global.client.getProtocol() + '://' + global.client.getUrl() + "/" + src;
 	}
 
 
 
-
-	if(field.size&&src.indexOf('https://')===0){
-		src=me._getImageThumb(src, field);
+	if (field.size && src.indexOf('https://') === 0) {
+		src = me._getImageThumb(src, field);
 	}
 
 
 	var image = new imageModule.Image();
-	console.log('set image: '+src);
+	console.log('set image: ' + src);
 	image.src = src;
 	return image;
 }
 
 
 
-
 ViewRenderer.prototype._getImageThumb = function(url, size) {
-	if(size.size){
-		size=size.size;
+	if (size.size) {
+		size = size.size;
 	}
 
-	return url.split('?')[0]+'?thumb='+size.w+'x'+size.h;
+	return url.split('?')[0] + '?thumb=' + size.w + 'x' + size.h;
 
 }
 
@@ -997,7 +1034,7 @@ ViewRenderer.prototype._getImageThumb = function(url, size) {
 
 ViewRenderer.prototype.renderButtonset = function(container, field, model) {
 
-	var me=this;
+	var me = this;
 
 	var buttons = [];
 
@@ -1010,18 +1047,17 @@ ViewRenderer.prototype.renderButtonset = function(container, field, model) {
 
 	container.addChild(wrapLayout);
 
-	
+
 
 	field.buttons.forEach(function(button) {
 
-		var btnEl=me.renderButtonsetButton(wrapLayout, button);
+		var btnEl = me.renderButtonsetButton(wrapLayout, button);
 		//buttons.push(btnEl);	
 
 		me._addEnabled(btnEl, button);
 
-		me.applyTapAction(btnEl,function(){
-			me._setSelected(btnEl, button, buttons);
-		});
+		me.addTapSelectedListener(btnEl, button, buttons);
+		me.addTapActionListener(btnEl, button);
 
 	});
 
@@ -1032,159 +1068,151 @@ ViewRenderer.prototype.renderButtonset = function(container, field, model) {
 }
 
 ViewRenderer.prototype._clearSelected = function(buttons) {
-	var me=this;
+	var me = this;
 	buttons.forEach(function(b) {
 		me._removeClass(b, "selected");
 	});
 }
 
 
-ViewRenderer.prototype._isImageAsset=function(asset){
+ViewRenderer.prototype._isImageAsset = function(asset) {
 
-	if(asset&&(typeof asset)!="string"){
+	if (asset && (typeof asset) != "string") {
 		console.log('is image asset')
 		return true;
-	}else{
+	} else {
 		return false;
 	}
 }
-ViewRenderer.prototype._imageFromImageAsset=function(asset){
+ViewRenderer.prototype._imageFromImageAsset = function(asset) {
 	var image = new imageModule.Image();
-	console.log('Set Image From Asset '+asset);
+	console.log('Set Image From Asset ' + asset);
 	image.src = asset;
 	return image;
 }
-ViewRenderer.prototype._isLocalFileAsset=function(asset){
-	if(typeof asset=="string"){
-		var filepath=asset;
+ViewRenderer.prototype._isLocalFileAsset = function(asset) {
+	if (typeof asset == "string") {
+		var filepath = asset;
 		var fs = require("file-system");
 
-		if(filepath.indexOf('/')<0){
+		if (filepath.indexOf('/') < 0) {
 			var savepath = fs.knownFolders.documents().path;
 			filepath = fs.path.join(savepath, asset);
 		}
-    	
-    	return fs.File.exists(filepath);
+
+		return fs.File.exists(filepath);
 	}
 	return false;
 }
 
-ViewRenderer.prototype._imageFromLocalFileAsset=function(asset){
-	if(typeof asset=="string"){
-		var filepath=asset;
+ViewRenderer.prototype._imageFromLocalFileAsset = function(asset) {
+	if (typeof asset == "string") {
+		var filepath = asset;
 
-		if(filepath.indexOf('/')<0){
-			var fs  = require("file-system");
+		if (filepath.indexOf('/') < 0) {
+			var fs = require("file-system");
 			var savepath = fs.knownFolders.documents().path;
 			filepath = fs.path.join(savepath, asset);
 		}
-    	
-    	var image = new imageModule.Image();
+
+		var image = new imageModule.Image();
 		image.src = filepath;
 		return image;
 	}
-	throw 'Expected file path: '+(typeof asset);
+	throw 'Expected file path: ' + (typeof asset);
 }
 
 
 
-    
-
 ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 
-	var me=this;
+	var me = this;
 
 	var imageStack = new stackLayoutModule.StackLayout();
-		container.addChild(imageStack);
+	container.addChild(imageStack);
 
-		var stackLayout = new stackLayoutModule.StackLayout();
-		stackLayout.className = "icon";
+	var stackLayout = new stackLayoutModule.StackLayout();
+	stackLayout.className = "icon";
 
-		me._addClass(stackLayout, "icon");
-		me._addClass(stackLayout, field);
-
-
-		imageStack.addChild(stackLayout);
+	me._addClass(stackLayout, "icon");
+	me._addClass(stackLayout, field);
 
 
-		if (field.icon) {
-			var icon=field.icon;
+	imageStack.addChild(stackLayout);
 
-			if(typeof icon=='string'&&icon[0]=="{"){
-				icon=me._createImage(icon);
-				stackLayout.addChild(icon);
 
-				if(field.stretch){
-					icon.stretch = field.stretch;
-				}
-			
-				if(field.label){
-					renderLabel(imageStack, {
-						value: field.label
-					});
-				}
-				return stackLayout;
+	if (field.icon) {
+		var icon = field.icon;
+
+		var uiimage=null;
+
+		if (typeof icon == 'string' && (icon[0] == "{"||icon.indexOf('/')>=0)) {
+			uiimage = me._createImage(icon);
+		}
+
+		if (me._isImageAsset(icon)) {
+			console.log('Assume that field.icon is an imageAsset');
+			uiimage = me._imageFromImageAsset(icon);
+		}
+
+
+		if(uiimage){
+			stackLayout.addChild(uiimage);
+
+			if (field.stretch) {
+				uiimage.stretch = field.stretch;
 			}
-			
-			if(me._isImageAsset(icon)){
-				console.log('Assume that field.icon is an imageAsset');
-				var image = me._imageFromImageAsset(icon);
+
+
+			if (field.label) {
+				renderLabel(imageStack, {
+					value: field.label
+				});
+			}
+			return stackLayout;
+		}
+
+
+
+
+
+		getConfiguration().getImage(icon)
+
+			.then(function(imgPath) {
+
+				console.log('Got Buttonset Image path: '+imgPath);
+
+				var image = new imageModule.Image();
+				image.src = imgPath;
 				stackLayout.addChild(image);
 
-				if(field.stretch){
-					image.stretch = field.stretch;
-				}
-				
-			
-				if(field.label){
-					renderLabel(imageStack, {
-						value: field.label
-					});
-				}
-				return stackLayout;
-			}	
-			
-
-
-
-			getConfiguration().getImage(icon)
-
-				.then(function(imgPath) {
-
-					console.log('Got Buttonset Image path')
-
-					var image = new imageModule.Image();
-					image.src = imgPath;
-					stackLayout.addChild(image);
-
-					if(field.label){
-						renderLabel(imageStack, {
-							value: field.label
-						})
-					}
-
-					if(field.stretch){
-						image.stretch = field.stretch;
-					}
-					
-
-
-				
-				})
-				.catch(function(err) {
-					console.log("Field Button Error: " + err);
-					//Still render the label.
+				if (field.label) {
 					renderLabel(imageStack, {
 						value: field.label
 					})
-				});
+				}
 
-		} else {
+				if (field.stretch) {
+					image.stretch = field.stretch;
+				}
 
-			me.renderButton(stackLayout, field);
-		}
-		
-		return stackLayout;
+
+
+			})
+			.catch(function(err) {
+				console.log("Field Button Icon From Configuration Variable("+icon+") Error: " + err);
+				//Still render the label.
+				renderLabel(imageStack, {
+					value: field.label
+				})
+			});
+
+	} else {
+
+		me.renderButton(stackLayout, field);
+	}
+
+	return stackLayout;
 
 
 
@@ -1196,20 +1224,63 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
  * action can be a string, or object with key `action`.
  * if action='event'` then must be {"action":"event", "event":"someEventName"}
  */
-
-ViewRenderer.prototype.applyTapAction = function(button, action) {
+ViewRenderer.prototype.addTapActionListener = function(button, field) {
 
 
 	var me = this;
-	var field=action;
+	var action = field;
 
-	if(action.action){
-		action=action.action
+	if (field.action) {
+		action = field.action
+	}
+
+	var validActions = ['submit', 'data', 'back', 'link', 'share', 'form', 'view', 'list', 'event'];
+
+	if (typeof action == "function" || validActions.indexOf(action) >= 0) {
+		button.on(buttonModule.Button.tapEvent, function() {
+			if(field.confirm){
+
+				var args={
+			        "title": (typeof field.confirm=="string"?field.confirm:"Are you sure?"),
+			        "message": ""
+			    };
+
+			    if(_isObject(field.confirm)){
+			    	args=extend(args, field.confirm);
+			    }
+
+				global.messages.confirm(args).then(function(result){
+
+			    	console.log('Result:'+result);
+			    	if(result){
+			    		me.executeTapAction(button, field)
+			    	}
+			    	
+			    });
+
+			}else{
+				me.executeTapAction(button, field)
+			}
+			
+		});
+		return;
+	}
+
+	console.log('Unknown button tap action: ' + action);
+
+}
+
+ViewRenderer.prototype.executeTapAction = function(button, field) {
+
+
+	var me = this;
+	var action = field;
+
+	if (field.action) {
+		action = field.action
 	}
 
 	console.log('Apply button action ' + action);
-
-
 
 
 
@@ -1220,9 +1291,8 @@ ViewRenderer.prototype.applyTapAction = function(button, action) {
 
 		console.log("Button With Function!");
 
-		button.on(buttonModule.Button.tapEvent, function() {
-			action(me.getCurrentFormData(), button);
-		});
+		action(me.getCurrentViewData(), button);
+
 
 		return;
 
@@ -1230,173 +1300,107 @@ ViewRenderer.prototype.applyTapAction = function(button, action) {
 
 
 	if (action == 'submit') {
-		button.on(buttonModule.Button.tapEvent, function() {
 
-			me.submit(field.back);
 
-		});
+		me.submit(field.back);
+
 
 		return
 	}
-	if (action == 'data'&&field.data) {
-		button.on(buttonModule.Button.tapEvent, function() {
-			Object.keys(field.data).forEach(function(k){
-				me._model.set(k, field.data[k]);
-			})
-		});
+	if (action == 'data' && field.data) {
+
+		Object.keys(field.data).forEach(function(k) {
+			me._model.set(k, field.data[k]);
+		})
+
 
 		return
 	}
 
 	if (action == 'back') {
-		button.on(buttonModule.Button.tapEvent, function() {
 
-			me.back(field.back);
+		me.back(field.back);
 
-		});
 		return
 	}
 
 	if (action == 'link') {
 
-		button.on(buttonModule.Button.tapEvent, function() {
 
-			var link=me._parse(field.link);
-			console.log(link)
-			utilityModule.openUrl(link);
-			return;
-		});
+		var link = me._parse(field.link);
+		console.log(link)
+		utilityModule.openUrl(link);
+
+
+		return;
 
 	}
 
 	if (action == 'share') {
 
-		var SocialShare = require("nativescript-social-share"); //loads faster here
-		button.on(buttonModule.Button.tapEvent, function() {
-			SocialShare.shareUrl(me._parse(field.link), field.linkLabel||"Some Text", "How do you want to share "+(field.linkTargetType||"this app"));
 
-			return;
-		});
+		SocialShare.shareUrl(me._parse(field.link), field.linkLabel || "Some Text", "How do you want to share " + (field.linkTargetType || "this app"));
+		return;
+
 
 	}
 
-	if (action == 'form'|| action == 'view'|| action == 'list') {
-		button.on(buttonModule.Button.tapEvent, function() {
-			var topmost = frameModule.topmost();
+	if (action == 'form' || action == 'view' || action == 'list') {
 
-			var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
-			if (field.name) {
-				contextOptions.form = contextOptions.form || field.name;
-			}
-			if(contextOptions.data&&typeof contextOptions.data=='string'){
-				contextOptions.data=me._parse(contextOptions.data);
-			}
+		var topmost = frameModule.topmost();
 
-			topmost.navigate({
-				moduleName: "views/form/form",
-				context: contextOptions
+		var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
+		if (field.name) {
+			contextOptions.form = contextOptions.form || field.name;
+		}
+		if (contextOptions.data && typeof contextOptions.data == 'string') {
+			contextOptions.data = me._parse(contextOptions.data);
+		}
 
-			});
+		topmost.navigate({
+			moduleName: "views/form/form",
+			context: contextOptions
+
 		});
+
 		return
 	}
 
 	if (action == 'event') {
-		button.on(buttonModule.Button.tapEvent, function() {
-			var eventData = {
-				eventName: field.event,
-				object: this
-			};
-			me.notify(eventData);
-		});
+
+		var eventData = {
+			eventName: field.event,
+			object: this
+		};
+		me.notify(eventData);
+
 		return
 	}
 
-	console.log('Unknown button tap action: ' + action);
 
+	throw 'Unknown button tap action: ' + action;
 
 
 };
+//TODO REPLACE CONTENTS OF THIS METHOD WITH CALL TO addTapActionListener ^^^
+ViewRenderer.prototype.addTapSelectedListener = function(button, field, buttons) {
 
-ViewRenderer.prototype._setSelected = function(button, field, buttons) {
+	var me = this;
 
-	var me=this;
+	button.on(buttonModule.Button.tapEvent, function() {
+		if (buttons) {
+			me._clearSelected(buttons);
+		}
 
-	if(buttons){
-		me._clearSelected(buttons);
-	}	
 
+		if (field.name && field.value) {
+			console.log('set:' + field.name + ' -> ' + field.value);
+			me._model.set(field.name, field.value);
+			me._addClass(button, "selected");
+		}
+	});
 
-	console.log('Tap');
 	
-	
-
-	if (typeof field.action == 'function') {
-		
-		field.action(me.getCurrentFormData(), button);
-		
-
-		return;
-	}
-
-
-	if (field.action == 'form'||field.action == 'view'||field.action == 'list') {
-
-
-
-		setTimeout(function() {
-			var topmost = frameModule.topmost();
-
-			var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
-			if (field.name) {
-				contextOptions.form = contextOptions.form || field.name;
-
-			}
-
-			topmost.navigate({
-				moduleName: "views/form/form",
-				context: contextOptions
-			});
-		}, 500);
-
-		return;
-	} else if (field.action == 'link') {
-
-		var link=me._parse(field.link);
-		console.log(link)
-		utilityModule.openUrl(link);
-		return;
-
-	} else if (field.action == 'share') {
-
-		button.on(buttonModule.Button.tapEvent, function() {
-		
-
-			var SocialShare = require("nativescript-social-share");
-			SocialShare.shareUrl(me._parse(field.link), field.linkLabel||"Some Text", "How do you want to share "+(field.linkTargetType||"this app"));
-
-			return;
-		});
-
-	} else if (field.action != 'none') {
-
-		var topmost = frameModule.topmost();
-
-		console.log('Attempting to navigate to custom view: views/' + field.action + '/' + field.action);
-
-		topmost.navigate({
-			moduleName: "views/" + field.action + "/" + field.action
-		});
-		return;
-	}
-
-
-	if (field.name && field.value) {
-		console.log('set:' + field.name + ' -> ' + field.value);
-		me._model.set(field.name, field.value);
-		me._addClass(button, "selected");
-	}
-
 }
 
 
@@ -1404,24 +1408,29 @@ var renderSpace = function(container, field) {
 
 }
 
-ViewRenderer.prototype.renderStyle = function(container, field) {
+ViewRenderer.prototype.renderStyle = function(style) {
 
-	var me=this;
-	getConfiguration().getStyle(field.stylename)
 
+	var me = this;
+
+	var styleUrl=style.stylename||style;
+	if(typeof styleUrl!='string'){
+		throw 'Expected style as string or style.stylename: '.JSON.stringify(style, null, '   ');
+	}
+
+	return getConfiguration().getStyle(styleUrl)
 	.then(function(stylePath) {
 
 
-			console.log(stylePath);
-			me._page.addCssFile(stylePath);
+		console.log(stylePath);
+		me._page.addCssFile(stylePath);
 
-		})
-		.catch(function(err) {
-			console.log("Render Style Error: " + err);
-		});
+	})
+	.catch(function(err) {
+		console.log("Render Style Error: " + err);
+	});
 
 }
-
 
 
 
@@ -1489,17 +1498,24 @@ ViewRenderer.prototype._pushSubform = function(name, callback) {
 	var me = this;
 	if (!me._models) {
 		me._models = [];
+		me._viewNames = [];
 	}
 	me._models.push(me._model);
+	me._viewNames.push(me._viewName);
 
-	global.pushSubform(name, callback);
+	me._pushSubformData(name, callback);
 };
 ViewRenderer.prototype._popSubform = function(name, callback) {
 	var me = this;
-	var current=me._model;
+	if (!me._models) {
+		me._models = [];
+		me._viewNames = [];
+	}
+	var current = me._model;
 	me._clearUpdateIntervals();
 	me._model = me._models.pop();
-	global.popSubform();
+	me._viewName=me._viewNames.pop();
+	me._popSubformData();
 };
 
 
@@ -1578,7 +1594,7 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 
 
 		getConfiguration().getLocalData(field.name, {}).then(function(data) {
-			global.setFormData(me.getCurrentFormData());
+			me._setFormData(me.getCurrentViewData());
 
 
 
@@ -1610,9 +1626,6 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 
 
 
-
-
-
 ViewRenderer.prototype.renderScroll = function(container, fields, model) {
 	var me = this;
 
@@ -1628,51 +1641,51 @@ ViewRenderer.prototype.renderScroll = function(container, fields, model) {
 }
 
 ViewRenderer.prototype._renderFields = function(container, fields) {
-	
-		var me = this;
 
-		if(fields&&(fields._domId||fields.ios||fields.android)){
+	var me = this;
 
-			container.addChild(fields);
-			return [fields];
-		}
+	if (fields && (fields._domId || fields.ios || fields.android)) {
 
-
-		if(_isObject(fields)){
-			fields=[fields];
-		}
-
-		if(_isArray(fields)) {
-			//console.log('Create StackLayout Array "right" '+JSON.stringify(right));
-			var elements=[];
-			fields.forEach(function(field) {
-				elements.push(me.renderField(container, field));
-			});
-			return elements;
-
-		}
-	
-		return [];
+		container.addChild(fields);
+		return [fields];
+	}
 
 
-	
+	if (_isObject(fields)) {
+		fields = [fields];
+	}
+
+	if (_isArray(fields)) {
+		//console.log('Create StackLayout Array "right" '+JSON.stringify(right));
+		var elements = [];
+		fields.forEach(function(field) {
+			elements.push(me.renderField(container, field));
+		});
+		return elements;
+
+	}
+
+	return [];
+
+
+
 }
 ViewRenderer.prototype.renderFieldset = function(container, fields) {
 	var me = this;
 
-	var stack=_createStack();
+	var stack = _createStack();
 	container.addChild(stack);
 
 
 	me.renderFields(stack, fields);
-	
+
 	return stack;
 }
 
 ViewRenderer.prototype.renderLayout = function(container, field) {
 
 
-	var me=this;
+	var me = this;
 
 	// <FlexboxLayout flexDirection="row" class="bottom-bar" id="bottom" flexShrink="0">
 	// 		<StackLayout id="bottom-left" orientation="horizontal">
@@ -1691,32 +1704,34 @@ ViewRenderer.prototype.renderLayout = function(container, field) {
 	container.addChild(flexbox);
 	//FlexboxLayout.setFlexShrink();
 
-	var name=field.name||'flexbox-bar';
-	var template=field.template||'flexbox';
+	var name = field.name || 'flexbox-bar';
+	var template = field.template || 'flexbox';
 
-	var left=_createStack();
-	var center=_createStack();
-	var right=_createStack();
+	var left = _createStack();
+	var center = _createStack();
+	var right = _createStack();
 
 	FlexboxLayout.setFlexGrow(center, 1);
+	FlexboxLayout.flexDirection="column";
 
-	
+
 	left.orientation = "horizontal";
 	center.orientation = "horizontal";
 	right.orientation = "horizontal";
 
-	left.id = name+"-left";
-	center.id = name+"-center";
-	right.id = name+"-right";
+	left.id = name + "-left";
+	center.id = name + "-center";
+	right.id = name + "-right";
 
 	flexbox.addChild(left);
 	flexbox.addChild(center);
 	flexbox.addChild(right);
 
-	
+
 	me._renderFields(left, field.left);
+	me._renderFields(center, field.center);
 	me._renderFields(right, field.right);
-		
+
 
 	me._addClass(flexbox, field);
 
@@ -1728,88 +1743,87 @@ ViewRenderer.prototype.renderLayout = function(container, field) {
 ViewRenderer.prototype._renderConditionalFieldset = function(container, field) {
 	var me = this;
 
-	var stack=_createStack();
+	var stack = _createStack();
 	container.addChild(stack);
 
 
-	
 
-	me._addClass(stack,"conditional");
-
+	me._addClass(stack, "conditional");
 
 
-	var elements=null;
-	var bindings=null;
-	var intervals=null;
 
-	var hide=function(){
+	var elements = null;
+	var bindings = null;
+	var intervals = null;
+
+	var hide = function() {
 		//unbind
-			console.log('remove feildset items');
-			elements.forEach(function(e){
-				//stack.removeChild(e);
-				if(e&&e.parent){
-					e.parent.removeChild(e);
-				}
-			})
-			elements=null;
-			if(bindings){
-				me._removeEventListeners(bindings);
-				bindings=null;
+		console.log('remove feildset items');
+		elements.forEach(function(e) {
+			//stack.removeChild(e);
+			if (e && e.parent) {
+				e.parent.removeChild(e);
 			}
-			if(intervals){
-				me._clearUpdateIntervals(intervals);
-				intervals=null;
-			}
+		})
+		elements = null;
+		if (bindings) {
+			me._removeEventListeners(bindings);
+			bindings = null;
+		}
+		if (intervals) {
+			me._clearUpdateIntervals(intervals);
+			intervals = null;
+		}
 
-			me._removeClass(stack,"active");
+		me._removeClass(stack, "active");
 	}
 
-	me._bind(field.condition, function(value){
+	me._bind(field.condition, function(value) {
 
-		if((!!value)&&elements===null){
+		if ((!!value) && elements === null) {
 
-			intervals=me._watchIntervalBindings(function(){
-				bindings=me._watchEventBindings(function(){
-					elements=me._renderFields(stack, field.fields);
+			intervals = me._watchIntervalBindings(function() {
+				bindings = me._watchEventBindings(function() {
+					elements = me._renderFields(stack, field.fields);
 				});
 			})
-			
 
-			me._addClass(stack,"active");
-			
+
+			me._addClass(stack, "active");
+
 		}
 
-		if((!value)&&elements&&elements.length){
+		if ((!value) && elements && elements.length) {
 			hide();
 		}
-		
+
 	});
 
 
 
 	var gestures = require("ui/gestures");
-	if(field.swipe){
+	if (field.swipe) {
 
-	
-		stack.on(gestures.GestureTypes.swipe, function (args) {
-			if(_isObject(field.swipe)){
-				Object.keys(field.swipe).forEach(function(k){
+
+		stack.on(gestures.GestureTypes.swipe, function(args) {
+			if (_isObject(field.swipe)) {
+				Object.keys(field.swipe).forEach(function(k) {
 					me._model.set(k, field.swipe[k]);
 				})
 			}
-			if(field.swipe=="hide"){
+			if (field.swipe == "hide") {
 				hide();
 			}
-		  
+
 		});
 	}
-	
 
-	
+
+
 }
 
 ViewRenderer.prototype.getElementById = function(id) {
-	var me=this;
+	var me = this;
 	return me._page.getViewById(id);
 
 }
@@ -1818,7 +1832,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 
 	var me = this;
-	var model=me._model;
+	var model = me._model;
 
 	if (!field) {
 		throw 'Requires a field!'
@@ -1832,9 +1846,9 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 		}
 
 
-		if(container!==defaultParentNode){
-			var eventName="insertAt"+field.position[0].toUpperCase()+field.position.split('-').shift().substring(1);
-			console.log('Insert Event: '+eventName);
+		if (container !== defaultParentNode) {
+			var eventName = "insertAt" + field.position[0].toUpperCase() + field.position.split('-').shift().substring(1);
+			console.log('Insert Event: ' + eventName);
 
 			var eventData = {
 				eventName: eventName,
@@ -1844,23 +1858,21 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 		}
 	}
 
-	
-	
 
 
 	if (!field.type) {
 		throw 'Field must have a type! ' + JSON.stringify(field, null, "   ")
 	}
 
-	if (field.condition&&field.type!='fieldset') {
+	if (field.condition && field.type != 'fieldset') {
 
-		
-			if(!me._parse(field.condition)){
-				return null;
-			}
-		
+		var show=me._parse(field.condition);
+		console.log('Render conditional Field: '+field.condition+' :'+(show?"show - ":"!show - ")+show);
+		if (!show) {
+			return null;
+		}
 
-		
+
 
 	}
 
@@ -1871,7 +1883,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 	if (field.type == 'label') {
 		return renderLabel(container, field, model);
-	
+
 	}
 
 	if (field.type == 'media') {
@@ -1888,6 +1900,9 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 	if (field.type == 'video') {
 		return me.renderVideoPlayer(container, field);
+	}
+	if (field.type == 'augmentedreality') {
+		return me.renderARView(container, field);
 	}
 	if (field.type == 'inlinevideo') {
 		return me.renderInlineVideoPlayer(container, field);
@@ -1935,12 +1950,12 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 
 	if (field.type == 'progressbar') {
-		 return renderProgressBar(container, field, model);
+		return renderProgressBar(container, field, model);
 
 	}
 
 	if (field.type == 'style') {
-		return me.renderStyle(container, field);
+		return me.renderStyle(field);
 
 	}
 	if (field.type == 'scroll') {
@@ -1951,7 +1966,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 		return renderImage(container, field);
 
 	}
-	
+
 	if (field.type == 'html') {
 		return renderHtml(container, field);
 
@@ -1970,15 +1985,14 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 	if (field.type == 'fieldset') {
 
-		if(field.condition){
+		if (field.condition) {
 			return me._renderConditionalFieldset(container, field);
-		}else{
+		} else {
 			return me.renderFieldset(container, field.fields);
 		}
 
 	}
 
-	
 
 
 	if (field.type == 'map') {
@@ -1987,9 +2001,14 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 
 	if (field.type == 'data') {
+		if(!_isObject(field.data)){
+			throw 'Expected field.data to exist and be an object: '+JSON.stringify(field, null, '   ');
+		}
 		Object.keys(field.data).forEach(function(k) {
 			console.log('add form data: ' + k + ' ' + field.data[k]);
-			model.set(k, field.data[k]);
+			var value=me._parse(field.data[k]);
+
+			model.set(k, value);
 		});
 		return;
 	}
@@ -2000,7 +2019,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 ViewRenderer.prototype.hasView = function(formName) {
 
-	var me=this
+	var me = this
 	var forms = global.parameters.views;
 
 	if (typeof forms == 'string' && forms[0] == "{") {
@@ -2013,12 +2032,15 @@ ViewRenderer.prototype.hasView = function(formName) {
 }
 
 
-ViewRenderer.prototype.getCurrentFormData = function(model) {
+/**
+ * returns data associated with the currently visible view
+ */
+ViewRenderer.prototype.getCurrentViewData = function(model) {
 	var me = this;
 
 	var data = {};
-	if(!model){
-		model=me._model;
+	if (!model) {
+		model = me._model;
 	}
 	Object.keys(model).forEach(function(k) {
 		if (k.indexOf('_') === 0) {
@@ -2032,11 +2054,11 @@ ViewRenderer.prototype.getCurrentFormData = function(model) {
 	return JSON.parse(JSON.stringify(data));
 }
 
-ViewRenderer.prototype.setCurrentFormData = function(data) {
+ViewRenderer.prototype.setCurrentViewData = function(data) {
 
 	var me = this;
 
-	console.log('Set Model Data From Form Data: ' + JSON.stringify(data) + " For Current View: " + global.getSubformName());
+	console.log('Set Model Data From Form Data: ' + JSON.stringify(data) + " For Current View: " + me.currentView());
 	Object.keys(data).forEach(function(k) {
 		console.log('set ' + k + '=' + data[k]);
 		me._model.set(k, data[k]);
@@ -2054,16 +2076,16 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 	model.set('submittingStateLabel', '');
 
 
-	page.on('navigatedTo',function(arg){
-		console.log('Navigated To '+JSON.stringify(Object.keys(arg)));
+	page.on('navigatedTo', function(arg) {
+		console.log('Navigated To ' + JSON.stringify(Object.keys(arg)));
 	})
-	page.on('navigatedFrom',function(arg){
-		console.log('Navigated From'+JSON.stringify(Object.keys(arg)));
-		console.log('Navigated From'+JSON.stringify(arg.context));
-		console.log('Navigated From'+JSON.stringify(arg.isBackNavigation));
-		console.log('Navigated From'+JSON.stringify(Object.keys(arg.object)));
+	page.on('navigatedFrom', function(arg) {
+		console.log('Navigated From' + JSON.stringify(Object.keys(arg)));
+		console.log('Navigated From' + JSON.stringify(arg.context));
+		console.log('Navigated From' + JSON.stringify(arg.isBackNavigation));
+		console.log('Navigated From' + JSON.stringify(Object.keys(arg.object)));
 
-		if(arg.isBackNavigation){
+		if (arg.isBackNavigation) {
 			me._clearUpdateIntervals();
 		}
 	})
@@ -2086,8 +2108,11 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 	var formName = "main";
 	if (context) {
-		if (context.view||context.form) {
-			formName =context.view||context.form;
+		if (context.view || context.form) {
+			formName = context.view || context.form;
+		}
+		if (context.name) {
+			formName = context.name;
 		}
 		if (context.events) {
 			Object.keys(context.events).forEach(function(e) {
@@ -2106,15 +2131,15 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 	me._viewName = formName;
 
 	me._addClass(container, "form-" + formName)
-	me._addClass(page, formName+"-view");
-	me._addClass(page, require("application").android?"android":"ios");
+	me._addClass(page, formName + "-view");
+	me._addClass(page, require("application").android ? "android" : "ios");
 
 
 
 	var elements = [];
-	if(fields){
+	if (fields) {
 		elements = fields
-	}else if (context.fields) {
+	} else if (context.fields) {
 		elements = context.fields
 	} else {
 
@@ -2130,11 +2155,12 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 		throw 'Invalid form fields: (' + (typeof elements) + ') for ' + formName;
 	}
 
+	me._renderDefaultStyle();
 	me._renderFields(container, elements);
 
-	var data = global.getFormData();
-	me.setCurrentFormData(data);
-	me.getCurrentFormData();
+	var data = me.getFormData();
+	me.setCurrentViewData(data);
+	//me.getCurrentViewData();
 
 
 	var eventData = {
@@ -2146,27 +2172,27 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 }
 
-ViewRenderer.prototype._getViewElements=function(name, view){
+ViewRenderer.prototype._getViewElements = function(name, view) {
 
-	var me=this;
-	var names=name;
-	if(!_isArray(name)){
-		names=[name];
+	var me = this;
+	var names = name;
+	if (!_isArray(name)) {
+		names = [name];
 	}
-	
-	name=names.shift();
-	console.log('look for view elements in '+name);
+
+	name = names.shift();
+	console.log('look for view elements in ' + name);
 	var views = global.parameters[name] || false;
 
 	if (typeof views == 'string' && views[0] == "{") {
 		views = me._parse(views);
 	}
 
-	if(views&&views[view]){
+	if (views && views[view]) {
 		return views[view];
 	}
 
-	if(names.length){
+	if (names.length) {
 		return me._getViewElements(names, view);
 	}
 
@@ -2181,51 +2207,49 @@ ViewRenderer.prototype._getViewElements=function(name, view){
 
 
 ViewRenderer.prototype._getListViewRenderer = function() {
-	var me=this;
-	if(!me._listViewRenderer){
+	var me = this;
+	if (!me._listViewRenderer) {
 		var ListViewRenderer = require('../').ListViewRenderer;
-		me._listViewRenderer=new ListViewRenderer();
+		me._listViewRenderer = new ListViewRenderer();
 	}
 	return me._listViewRenderer;
 }
 ViewRenderer.prototype.renderSplit = function(container, field) {
-	var me=this;
+	var me = this;
 	return me._getListViewRenderer().renderSplit(container, field);
 }
 
 ViewRenderer.prototype.renderList = function(container, field) {
-	var me=this;
+	var me = this;
 	return me._getListViewRenderer().renderList(container, field);
 }
 
 ViewRenderer.prototype.setListResolver = function(name, fn) {
-	var me=this;
+	var me = this;
 	return me._getListViewRenderer().setListResolver(name, fn);
 }
 
 
 
-
-
 ViewRenderer.prototype._createStack = function(items) {
 
-	var me=this;
+	var me = this;
 	//console.log('Create StackLayout');
 	var stackLayout = new stackLayoutModule.StackLayout();
 
-	if(items){
-		items.forEach(function(item){
+	if (items) {
+		items.forEach(function(item) {
 
-			if((item._domId||item.ios||item.android)){
+			if ((item._domId || item.ios || item.android)) {
 				stackLayout.addChild(item);
 				return;
 			}
-			if(_isObject(item)){
+			if (_isObject(item)) {
 				me.renderField(stackLayout, item);
 				return;
 			}
-			throw 'Unknown item _createStack(item): '+item;
-			
+			throw 'Unknown item _createStack(item): ' + item;
+
 		})
 	}
 
@@ -2237,6 +2261,90 @@ var _createStack = function(items) {
 }
 
 
+
+
+
+var submittableFormData = {};
+ViewRenderer.prototype.getFormData = function() {
+    var form = submittableFormData;
+
+    subFormsNames.forEach(function(s) {
+        if (!form[s]) {
+            form[s] = {};
+
+        }
+        form = form[s];
+    });
+    var data = {};
+    Object.keys(form).forEach(function(k) {
+        if (k.indexOf('_') === 0) {
+            return;
+        }
+        data[k] = form[k];
+    });
+    return JSON.parse(JSON.stringify(data)); //remove any references
+}
+global.getFormData=function(){
+	return instance.getFormData()
+}
+
+
+
+var subFormsNames = [];
+var subFormsCallbacks = {};
+var getSubformName = function() {
+
+    if (subFormsNames.length === 0) {
+        return 'root';
+    }
+
+    var name = subFormsNames[subFormsNames.length - 1];
+    return name;
+}
+ViewRenderer.prototype._popSubformData = function() {
+
+
+
+    var name = subFormsNames[subFormsNames.length - 1];
+    console.log('Pop Subform: ' + name);
+    if (subFormsCallbacks[name]) {
+        subFormsCallbacks[name](global.getFormData());
+        delete subFormsCallbacks[name];
+    }
+
+    subFormsNames.pop();
+
+}
+ViewRenderer.prototype._pushSubformData = function(name, callback) {
+    console.log('Push Subform: ' + name)
+    subFormsNames.push(name);
+
+    if (callback) {
+        subFormsCallbacks[name] = callback;
+    }
+}
+
+
+
+ViewRenderer.prototype._setFormData = function(data) {
+    var form = submittableFormData;
+
+    subFormsNames.forEach(function(s) {
+        if (!form[s]) {
+            form[s] = {};
+
+        }
+        form = form[s];
+    });
+
+
+
+    Object.keys(data).forEach(function(k) {
+        form[k] = data[k];
+    });
+    console.log('Set Form Data for: ' + getSubformName() + ': ' + JSON.stringify(form));
+
+}
 
 
 module.exports = ViewRenderer;
