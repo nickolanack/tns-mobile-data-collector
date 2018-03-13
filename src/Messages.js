@@ -6,7 +6,9 @@ var loaded=false;
 
 function Messages(params) {
 
+
 	if(loaded){
+		console.log('Should be singleton');
 		throw 'Should be singleton';
 	}
 	loaded=true;
@@ -16,14 +18,42 @@ function Messages(params) {
 	IPublicChannelEventListener = require("pusher-nativescript/interfaces");
 
 	var me=this;
+	me.params=params;
+
+
+
+};
+Messages.prototype.connect=function(){
+
+
+
+	var me=this;
+	var params=me.params;
+
+
 	me.prefix=params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.';
 	console.log('Initializing pusher: '+params.pusherAppKey+' + '+me.prefix);
 	// Creating a new Pusher instance
-	var pusher = new Pusher(params.pusherAppKey);
+	var pusher = new Pusher(params.pusherAppKey,{
+		cluster:params.pusherCluster,
+		encrypted:true
+	});
 	 
-	// Establishing a connection with Pusher
+	
+
+
 	pusher.connect().then(() => {
-	  // Connected successfully
+	  console.log('Pusher Connected Successfully');
+	  me.pusher=pusher;
+
+	  if(me._queue){
+	  	console.log('Adding queued subscriptions');
+	  	me._queue.forEach(function(sub){
+	  		me._subscribe(sub.channel, sub.event, sub.callback);
+	  	});
+	  	delete me._queue;
+	  }
+
 	}).catch(error => {
 	  console.log("Pusher Error Connect:"+JSON.stringify({
 	  	"pusherAppChannelPrefix":params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.',
@@ -31,22 +61,26 @@ function Messages(params) {
 	  }));
 	  console.log(error);
 	});
-	 
-	me.pusher=pusher;
 
-	 
-	// Disconnecting from the service
-	//pusher.disconnect();
+	console.log('Pusher connecting.');
+}
 
 
-
-
-
-
-
-};
 
 Messages.prototype.subscribe = function(channel, event, callback) {
+	var me=this;
+	if(me.pusher){
+		me._subscribe(channel, event, callback);
+		return;
+	}
+	if(!me._queue){
+		me._queue=[];
+	}
+	console.log('Channel subscription and event binding queued: '+channel+' '+event);
+	me._queue.push({channel:channel, event:event, callback:callback});
+	
+}
+Messages.prototype._subscribe = function(channel, event, callback) {
 
 	var me=this;
 	if(!callback){
@@ -73,7 +107,7 @@ Messages.prototype.subscribe = function(channel, event, callback) {
 		  onEvent:function(response) {
 		    console.log('Handling new arriving data from my_event');
 		    console.log(JSON.stringify(response.data));
-		    callback(response.data);
+		    callback(JSON.parse(JSON.stringify(response.data))); //IOS but responce data containers NSDictionary ...
 		  },
 		 
 		  onSubscriptionSucceeded:function(channelName) {
@@ -85,7 +119,7 @@ Messages.prototype.subscribe = function(channel, event, callback) {
 	var channelTypeAndName ='public-'+me.prefix+channel;
 	var eventName = event;
 	 
-	// Subscribing to a public channel and listening for events called "my_event" sent to "my_public_channel"
+	console.log('Channel subscription and event binding attempting: '+channel+' '+event);
 	me.pusher.subscribe(channelTypeAndName, eventName, publicChannelEventsListeners).then(() => {
 	  console.log('Channel subscription and event binding succeeded');
 	}).catch(error => {

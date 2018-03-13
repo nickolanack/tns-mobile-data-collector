@@ -1,3 +1,5 @@
+
+
 function Template() {
 
 
@@ -15,7 +17,7 @@ Template.SetJsonPath=function(path){
 
 Template.prototype.hasTemporalFormatter = function(str) {
 
-	return str.indexOf('|dateFromNow}')>0||str.indexOf('|date}')>0
+	return str.indexOf('|dateFromNow}')>0||str.indexOf('now')>0
 
 }
 
@@ -83,6 +85,56 @@ Template.prototype._format = function(data, formatters) {
 
 		}
 
+		//Destructure !!
+
+		if(format.indexOf('=>(')===0){
+
+			var arg=format.split('=>(')[1].split(')')[0];
+			
+			data=data.map(function(d){
+				return d[arg];
+			})
+			
+
+		}
+
+		if(format.indexOf('split(')===0){
+
+			var arg=format.split('split(')[1].split(')')[0];
+			
+			data=data.split(arg);
+			
+
+		}
+
+		if(format.indexOf('join(')===0){
+
+			var arg=format.split('join(')[1].split(')')[0];
+			
+			data=data.join(arg);
+			
+
+		}
+
+		if(format.indexOf('slice(')===0){
+
+			var args=format.split('slice(')[1].split(')')[0].split(',').map(function(a){
+				return parseInt(a);
+			});
+			
+			data=Array.prototype.slice.apply(data, args);			
+
+		}
+
+		if(format.indexOf('pop')===0){
+
+			data=data.pop();		
+
+		}
+		if(format.indexOf('shift')===0){
+			data=data.shift();		
+		}
+
 
 		if (format === "lower") {
 			data = data.toLowerCase();
@@ -105,6 +157,12 @@ Template.prototype._format = function(data, formatters) {
 			data = JSON.stringify(data, null, '   ');
 			data=data.split(":").join('=>').split("{").join(':').split("}").join('');
 		}
+
+		if (format === "urlencode") {
+			data = encodeURIComponent(data);
+			
+		}
+
 		if (format === "images") {
 
 			var Parser = require('./HtmlParser.js');
@@ -259,6 +317,19 @@ Template.prototype._render = function(template, data, prefix) {
 			    }
 			}
 
+			if(str.indexOf('.html}')>0){
+				var fileName=str.substring(1,str.length-1);
+				console.log("resolve external variables: "+fileName);
+				
+				var fs=require('file-system');
+				var filePath = fs.path.join(BasePath, fileName);
+			
+			    if (fs.File.exists(filePath)) {
+			       var file = fs.File.fromPath(filePath);
+			       return file.readTextSync();
+			    }
+			}
+
 
 
 			for (var h = 0; h < indexes.length; h++) {
@@ -278,6 +349,11 @@ Template.prototype._render = function(template, data, prefix) {
 					if (str === '{' + prefix + key + '}') {
 
 						if(me._replaceLiterals){
+
+							if(typeof value=="number"){
+								str = str.replace('{' + prefix + key + '}', '{`'+value+'`}');
+							}
+
 							return str;
 						}
 
@@ -298,7 +374,7 @@ Template.prototype._render = function(template, data, prefix) {
 				//str=str.replace('{'+prefix+key+'|', '{'+data[key]+'|'); //leave wrap. 
 
 				
-					str=me._replaceVariableLoop(str, prefix, key, data);
+				str=me._replaceVariableLoop(str, prefix, key, data);
 				
 
 

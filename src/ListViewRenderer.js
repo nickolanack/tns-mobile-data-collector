@@ -144,9 +144,7 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 			var model=me._renderer._model;
 		
 			if(list&&list.length>0){
-				if(field.before){
-					me._renderer._renderFields(stack, field.before);
-				}
+				
 
 
 				var fieldSetList=me._renderer._parse(list, field.listItemFormat||"{value}");
@@ -159,6 +157,12 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 						return sa>sb?1:0;
 						
 					})
+				}
+
+
+				if(field.before){
+					var fieldsBefore=me._parseLiterals({list:fieldSetList}, field.before);
+					me._renderer._renderFields(stack, fieldsBefore);
 				}
 
 				console.log("fieldSetList: "+JSON.stringify(fieldSetList));
@@ -181,13 +185,21 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 
 					
 				};
-				fieldSetList.splice(0, 10).forEach(renderItemsFieldset);
-				var interval=setInterval(function(){
+
+				if(field.listItemFields){
+
 					fieldSetList.splice(0, 10).forEach(renderItemsFieldset);
-					if(fieldSetList.length==0){
-						clearInterval(interval);
-					}
-				},2000);
+					var interval=setInterval(function(){
+						fieldSetList.splice(0, 10).forEach(renderItemsFieldset);
+						if(fieldSetList.length==0){
+							clearInterval(interval);
+						}
+					},2000);
+
+				}else{
+					console.log('Did not find field.listItemFields in list template.')
+				}
+				
 				
 
 

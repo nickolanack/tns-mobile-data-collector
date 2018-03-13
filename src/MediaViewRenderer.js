@@ -14,12 +14,19 @@ function MediaViewRenderer() {
 }
 
 
-var extend = function(a, b) {
+var extend = function() {
 
-	b = b || {};
-	Object.keys(b).forEach(function(k) {
-		a[k] = b[k];
-	});
+
+	var a=arguments[0];
+	var items=Array.prototype.slice.call(arguments, 1);
+
+	items.forEach(function(b){
+		b = b || {};
+		Object.keys(b).forEach(function(k) {
+			a[k] = b[k];
+		});
+	})
+	
 
 	return a;
 }
@@ -254,23 +261,32 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			var buttons = []
 			
 			if (mediaOptions.showImage && (!hideButton())) {
-				me._renderer.renderButton(mediaSelection, {
+				me._renderer.renderField(mediaSelection, extend({
+
+					type:"button",
 					label: mediaOptions.labelForImage,
-					className: "add-photo",
+					className: "add-photo"
+					
+				}, field.imageButton||field.button, {
+
 					action: function() {
 						addPhoto();
 					}
-				});
+
+				}));
 			}
 
 			if (mediaOptions.showVideo && (!hideButton())) {
-				me._renderer.renderButton(mediaSelection, {
+				me._renderer.renderField(mediaSelection, extend({
+					type:"button",
 					label: mediaOptions.labelForVideo,
-					className: "add-video",
+					className: "add-video"
+					
+				}, field.videoButton||field.button, {
 					action: function() {
 						addVideo();
 					}
-				})
+				}));
 			}
 
 		});
@@ -435,13 +451,16 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 
 			var buttons = [];
-			me._renderer.renderButton(mediaSelection, {
+			me._renderer.renderField(mediaSelection, extend({
+				type:"button",
 				label: mediaOptions.labelForAudio,
-				className: "add-video",
+				className: "add-video"
+				
+			}, field.audioButton||field.button, {
 				action: function() {
 					showAddAudioView();
 				}
-			})
+			}))
 		}
 
 

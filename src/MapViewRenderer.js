@@ -82,7 +82,8 @@ MapViewRenderer.prototype.renderMap = function(container, field) {
 				"description":event.marker.userData.description,
 				"creationDate":event.marker.userData.creationDate,
 				"uid": event.marker.userData.uid,
-				"icon":event.marker.userData.icon
+				"icon":event.marker.userData.icon,
+				"userData":event.marker.userData
 			}
 		});
 
@@ -166,9 +167,23 @@ function requestPermissions() {
   });
 }
 
-function loadLayers(mapView, field){
 
+MapViewRenderer.prototype._resolveLayer = function(layer) {
+	var me=this;
+	if(typeof layer=='string'||typeof layer=='number'){
+		var args=[layer];
+		var promise = me._renderer._getListViewRenderer()._listResolvers['layer'].apply(null, args);
+		return promise;
+	}
 
+	return new Promise(function(resolve){
+		resolve(list);
+	});
+}
+
+MapViewRenderer.prototype.loadLayers=function(mapView, field){
+
+	var me=this;
 	var layers=field.layers||getConfiguration().get('layers', function(){
 		return [getConfiguration().get('layer')];
 	});
@@ -176,12 +191,8 @@ function loadLayers(mapView, field){
 	console.log('Render Layers: '+JSON.stringify(layers));
 
 	layers.forEach(function(l){
-		global.client.getLayer(l).then(function(layer){
-
-			layer.items.forEach(function(item){
-
-
-				
+		me._resolveLayer(l).then(function(list){
+			list.forEach(function(item){
 
 				getConfiguration().getImage(item.icon, item.icon).then(function(iconPath){
 
@@ -192,13 +203,9 @@ function loadLayers(mapView, field){
 				 marker.title = item.name;
 				 //marker.snippet = item.description;
 				 
-				 marker.userData = {
-				 	id: item.id,
-				 	description:item.description,
-				 	creationDate:item.creationDate,
-				 	uid: item.uid,
+				 marker.userData = extend({
 				 	icon:iconPath
-				 };
+				 },item);
 
 				 
 				 var image=new imageModule.Image();
@@ -213,25 +220,23 @@ function loadLayers(mapView, field){
 				 }).catch(function(e){
 				 	console.log('Failed to get image: '+iconPath+": "+e);
 				 	console.log('Error: '+e);
-				 })
-
+				 });
 
 			});
 
 		}).catch(function(e){
 			console.trace();
 			console.log('Error: '+e);
-		})
+		});
 
-	})
+	});
 
 	
-
-
-}
+};
 
 MapViewRenderer.prototype._onMapReady=function(mapView, field) {
 	console.log('On Map Ready');
+	var me=this;
 
 	mapView.latitude=field.center[0]; 
 	mapView.longitude=field.center[1];
@@ -262,7 +267,7 @@ MapViewRenderer.prototype._onMapReady=function(mapView, field) {
 	mapView.settings.zoomGesturesEnabled = true;
 
 	
-	loadLayers(mapView, field);
+	me.loadLayers(mapView, field);
 
 
 }

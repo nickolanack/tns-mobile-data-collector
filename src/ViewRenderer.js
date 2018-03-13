@@ -30,6 +30,8 @@ var instance;
 var SocialShare;
 var PullToRefresh;
 
+var textViewModule;
+
 
 function ViewRenderer() {
 
@@ -37,6 +39,8 @@ function ViewRenderer() {
 
 	labelModule = require("ui/label");
 	textFieldModule = require("ui/text-field");
+
+	textViewModule = require("ui/text-view");
 	listPickerModule = require("ui/list-picker");
 	switchModule = require("ui/switch");
 	camera = require("nativescript-camera");
@@ -543,7 +547,7 @@ ViewRenderer.prototype._createText = function(field) {
 ViewRenderer.prototype._getARViewRenderer = function(container, field) {
 	var me = this;
 	if (!me._arViewRenderer) {
-		var ARViewRenderer = require('../').ARViewRenderer
+		var ARViewRenderer = require('../').ARViewRenderer;
 		me._arViewRenderer = new ARViewRenderer();
 	}
 	return me._arViewRenderer;
@@ -619,7 +623,7 @@ var renderHtml = function(container, field) {
 
 
 	var htmlView = new htmlViewModule.HtmlView();
-	htmlView.html = instance._parse(field.value);
+	htmlView.html = '<body style="font-family:sans-serif;">'+instance._parse(field.value)+'</body>';
 	container.addChild(htmlView);
 
 }
@@ -636,12 +640,22 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 		me.renderField(container, field.field);
 	}
 
+	var Accuracy=require('ui/enums').Accuracy;
+
 	me._app().requireAccessToGPS().then(function(geolocation) {
 
 		console.log('Requesting location');
 
+		geolocation.getCurrentLocation({ desiredAccuracy: Accuracy.high, maximumAge: 5000, timeout: 20000 }).then(function(loc){
+			if (loc) {
+				console.log("Current location is: " + JSON.stringify(loc));
+				model.set(field.name, [loc.latitude, loc.longitude, loc.altitude]);
+			}
+		}).catch(function(e){
+			console.log("Location Error: "+JSON.stringify(e.message||e))
+		});
 
-		var location = geolocation.watchLocation(
+		var watchObserverNumber=geolocation.watchLocation(
 			function(loc) {
 
 				if (loc) {
@@ -651,16 +665,18 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 
 			},
 			function(e) {
-				console.log("Error: " + e.message);
+				console.log("Location Error: " + JSON.stringify(e.message||e));
 				//getLocation();
 			}, {
-				desiredAccuracy: 3,
+				desiredAccuracy: Accuracy.high,
 				updateDistance: 10,
 				minimumUpdateTime: 1000 * 10
 			});
 
 
-	});
+	}).catch(function(e){
+		console.log("Location Error: "+JSON.stringify(e.message||e))
+	})
 
 
 }
@@ -697,9 +713,13 @@ ViewRenderer.prototype.setSubmitHandler = function(handler) {
 	this._submitHandler=handler;
 }
 
-ViewRenderer.prototype.submit = function(num) {
+ViewRenderer.prototype.submit = function(field) {
 
 	var me = this;
+	var num=field;
+	if(num.back){
+		num=num.back;
+	}
 
 	me._setFormData(me.getCurrentViewData());
 
@@ -710,8 +730,14 @@ ViewRenderer.prototype.submit = function(num) {
 		n--;
 	}
 
+	var fieldData={};
+	if(field.data){
+		fieldData=JSON.parse(JSON.stringify(field.data));
+	}
 
-	me._submitHandler(me.getFormData(), me.currentView(), function(data) {
+
+
+	me._submitHandler(extend(fieldData, me.getFormData()), field.name||me.currentView(), function(data) {
 
 		submittableFormData={};
 
@@ -745,6 +771,37 @@ var renderTextField = function(container, field, model) {
 
 	textfield.returnKeyType='done';
 
+	if(field.placeholder){
+		textfield.hint = field.placeholder;
+	}
+	
+
+	instance._addClass(textfield, "textfield")
+	var bindingOptions = {
+		sourceProperty: field.name,
+		targetProperty: "text",
+		twoWay: true
+	}
+
+	textfield.bind(bindingOptions, model);
+	model.set(field.name, model.get(field.name)||"");
+
+	if(field.value){
+		textfield.text=field.value;
+		model.set(field.name, field.value);
+	}
+
+	container.addChild(textfield);
+
+}
+var renderTextFieldArea = function(container, field, model) {
+
+
+
+	var textfield = new textViewModule.TextView();
+
+	textfield.returnKeyType='done';
+
 	textfield.hint = field.placeholder;
 
 	instance._addClass(textfield, "textfield")
@@ -756,6 +813,11 @@ var renderTextField = function(container, field, model) {
 
 	textfield.bind(bindingOptions, model);
 	model.set(field.name, model.get(field.name)||"");
+
+	if(field.value){
+		textfield.text=field.value;
+		model.set(field.name, field.value);
+	}
 
 	container.addChild(textfield);
 
@@ -878,7 +940,7 @@ var renderIconselect = function(container, field, model) {
 
 		imageStack.addChild(stackLayout);
 
-
+		
 
 		getConfiguration().getIcon(icon.icon)
 
@@ -1057,7 +1119,7 @@ ViewRenderer.prototype.renderButtonset = function(container, field, model) {
 		me._addEnabled(btnEl, button);
 
 		me.addTapSelectedListener(btnEl, button, buttons);
-		me.addTapActionListener(btnEl, button);
+		
 
 	});
 
@@ -1132,9 +1194,8 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 	container.addChild(imageStack);
 
 	var stackLayout = new stackLayoutModule.StackLayout();
-	stackLayout.className = "icon";
 
-	me._addClass(stackLayout, "icon");
+	me._addClass(stackLayout, "bs-btn icon");
 	me._addClass(stackLayout, field);
 
 
@@ -1169,6 +1230,8 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 					value: field.label
 				});
 			}
+
+			me.addTapActionListener(stackLayout, field);
 			return stackLayout;
 		}
 
@@ -1212,6 +1275,7 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 		me.renderButton(stackLayout, field);
 	}
 
+	me.addTapActionListener(stackLayout, field);
 	return stackLayout;
 
 
@@ -1302,7 +1366,7 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 	if (action == 'submit') {
 
 
-		me.submit(field.back);
+		me.submit(field);
 
 
 		return
@@ -1339,7 +1403,7 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 	if (action == 'share') {
 
 
-		SocialShare.shareUrl(me._parse(field.link), field.linkLabel || "Some Text", "How do you want to share " + (field.linkTargetType || "this app"));
+		SocialShare.shareUrl(me._parse(field.link), me._parse(field.linkLabel) || "Some Text", "How do you want to share this " + (field.linkTargetType || "app"));
 		return;
 
 
@@ -1353,8 +1417,10 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 		if (field.name) {
 			contextOptions.form = contextOptions.form || field.name;
 		}
-		if (contextOptions.data && typeof contextOptions.data == 'string') {
-			contextOptions.data = me._parse(contextOptions.data);
+		if (contextOptions.data ) {
+			//if(typeof contextOptions.data == 'string'){
+				contextOptions.data = me._parse(contextOptions.data);
+			//}
 		}
 
 		topmost.navigate({
@@ -1676,8 +1742,11 @@ ViewRenderer.prototype.renderFieldset = function(container, fields) {
 	var stack = _createStack();
 	container.addChild(stack);
 
+	if(typeof fields=="string"){
+		fields=me._parse(fields);
+	}
 
-	me.renderFields(stack, fields);
+	me._renderFields(stack, fields);
 
 	return stack;
 }
@@ -1778,7 +1847,18 @@ ViewRenderer.prototype._renderConditionalFieldset = function(container, field) {
 		me._removeClass(stack, "active");
 	}
 
+	var _last=null;
+
 	me._bind(field.condition, function(value) {
+
+		if(!!value&&elements&&_last!==JSON.stringify(value)){
+
+			//hide, and show on the boolean value of `value` but also
+			//redraw if value changes
+			hide();
+			_last=JSON.stringify(value);
+		}
+
 
 		if ((!!value) && elements === null) {
 
@@ -1821,6 +1901,19 @@ ViewRenderer.prototype._renderConditionalFieldset = function(container, field) {
 
 
 }
+
+/**
+ * This can be used to alter the current view.
+ */
+ViewRenderer.prototype.extendCurrentData = function(data) {
+	var me=this;
+
+	Object.keys(data).forEach(function(k) {
+		me._model.set(k, data[k]);
+	});
+
+}
+
 
 ViewRenderer.prototype.getElementById = function(id) {
 	var me = this;
@@ -1911,6 +2004,9 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	if (field.type == 'textfield') {
 		return renderTextField(container, field, model);
 	}
+	if (field.type == 'textarea') {
+		return renderTextFieldArea(container, field, model);
+	}
 
 	if (field.type == 'optionlist') {
 		return renderOptionList(container, field, model);
@@ -1941,6 +2037,11 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 	if (field.type == 'button') {
 		return me.renderButton(container, field, model);
+
+	}
+
+	if (field.type == 'icon') {
+		return me.renderButtonsetButton(container, field, model);
 
 	}
 
@@ -2122,7 +2223,7 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 		if (context.data) {
 			Object.keys(context.data).forEach(function(k) {
-				console.log('add form context data: ' + k + ' ' + context.data[k]);
+				console.log('add form context data: ' + k + ' ' + JSON.stringify(context.data[k]));
 				model.set(k, context.data[k]);
 			});
 		}

@@ -196,7 +196,7 @@ Account.prototype.login = function() {
 					};
 					me.notify(eventData);
 
-
+					console.log('resolve login');
 					resolve(config);
 
 					var eventData = {
@@ -271,7 +271,7 @@ Account.prototype.login = function() {
 
 
 		}).catch(function(e) {
-			console.log('FailFail');
+			console.log('Failed: '+JSON.stringify(e));
 			reject(e);
 		});
 

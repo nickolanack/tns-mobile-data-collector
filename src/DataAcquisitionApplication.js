@@ -34,6 +34,17 @@ function DataAcquisitionApplication(client, params) {
 
     instance = me;
 
+    client.on('wentOnline',function(){
+        console.log('got went online');
+        me._setOnline();
+
+    });
+
+    client.on('wentOffline',function(){
+        console.log('got went offline');
+        me._setOffline();
+    });
+
 }
 
 
@@ -56,6 +67,10 @@ DataAcquisitionApplication.SharedInstance = function() {
         throw 'Singleton class requires instantiation';
     }
     return instance;
+}
+
+DataAcquisitionApplication.prototype._config = function() {
+    return require('../').Configuration.SharedInstance();
 }
 
 
@@ -139,6 +154,10 @@ DataAcquisitionApplication.prototype.getMessageManager = function() {
 
     var Messages = require('../').Messages;
     var messages = new Messages(me.options.parameters);
+    setTimeout(function(){
+        messages.connect();
+    },4000);
+
 
     me._messageManager = messages;
     return me._messageManager
@@ -163,7 +182,7 @@ DataAcquisitionApplication.prototype._params = function(data) {
 
     var me = this;
 
-    var params = JSON.parse(JSON.stringify(me.options.parameters));
+    var params = JSON.parse(JSON.stringify(me._config().getDefaultParameters()));
     params.data = JSON.parse(JSON.stringify(data));
     return params;
 
@@ -197,7 +216,7 @@ DataAcquisitionApplication.prototype._submitData = function(data, callback) {
     me._submitHandler(formData, formName).then(function(result) {
 
         console.log('Submitted Form: ' + JSON.stringify(result, null, '   '));
-        callback();
+        callback(null, result);
 
     }).catch(function(err) {
 
@@ -266,6 +285,7 @@ DataAcquisitionApplication.prototype._setOnline = function() {
 }
 
 DataAcquisitionApplication.prototype._setOffline = function() {
+    var me=this;
     me._online = false;
 }
 
@@ -290,7 +310,7 @@ DataAcquisitionApplication.prototype._processOfflineForms = function() {
             console.log("Dialog closed!");
             var sendNext = function() {
                 if (list.length) {
-                    processFormFilePath(list.shift(), null, sendNext);
+                    me._processFormFilePath(list.shift(), null, sendNext);
                 }
             }
             sendNext();
@@ -418,9 +438,14 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
     var mediaFields = ['media', 'media-audio', 'media-video', 'media-image']
 
     file.readText().then(function(content) {
-
-
-        var data = JSON.parse(content);
+         var data;
+        try{
+             data=JSON.parse(content);
+         }catch(e){
+            console.log('Invalid JSON: '+content);
+            throw e;
+         }
+       
 
         console.log('Read: ' + content)
 
@@ -462,7 +487,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
             return mediaData(item);
         });
 
-        data["media-urls"]=media.map(function(item) {
+        data["media-urls"]=data["media-metadata-set"].map(function(item) {
             var preffered='url';
             var alsoPushTo=null;
             if(item.type){
@@ -475,8 +500,8 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
                 }
 
             }
-            var meta=mediaData(item);
-            var url=meta[preffered]||meta.url||meta.image||meta.video||meta.audio||meta.document;
+            //var meta=mediaData(item);
+            var url=item[preffered]||item.url||item.image||item.video||item.audio||item.document;
             if(alsoPushTo){
                 alsoPushTo.push(url);
             }
@@ -487,13 +512,13 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
         data.description = (data.description ? data.description : "") + media.map(function(item) {
             return mediaData(item).html;
         }).join("");
-        me._submitData(data, function(err) {
+        me._submitData(data, function(err, response) {
 
             if (!err) {
                 file.remove();
             }
 
-            callback(err);
+            callback(err, response);
 
         });
 
@@ -516,10 +541,10 @@ var mediaData = function(filename) {
 
     var fileMetaName = filename + '.json';
     fileMetaName = fileMetaName.split('/').pop()
-    var file = fs.File.fromPath(fs.path.join(fs.knownFolders.documents().path, fileMetaName));
+   
+    var filepath=fs.path.join(fs.knownFolders.documents().path, fileMetaName);
 
-
-    if(!fs.File.exists(filename)){
+    if(!fs.File.exists(filepath)){
         //should only be here if filename is an actual url!
         return {
             "image":filename,
@@ -527,6 +552,8 @@ var mediaData = function(filename) {
             "html":"<img src=\""+filename+"\" />"
         };
     }
+
+     var file = fs.File.fromPath(filepath);
 
     // Writing text to the file.
     var data = file.readTextSync(function(err) {
@@ -538,7 +565,7 @@ var mediaData = function(filename) {
     try {
         json = JSON.parse(data);
     } catch (e) {
-        console.log(data);
+        console.log("Invalid JSON: ("+file.path+":"+filename+")"+data);
         throw e;
     }
 
@@ -721,7 +748,7 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
     }
     me._storeFormJson(formData, formName).then(function(file) {
         if (me.isOnline()) {
-            me._processFormFile(file, null, function(err) {
+            me._processFormFile(file, null, function(err, response) {
                 if (err) {
 
 
@@ -737,7 +764,8 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
 
                 var eventData = {
                     eventName: "submitFormSuccess",
-                    object: me
+                    object: me,
+                    response:response
                 };
                 callback(callbackData);
                 me.notify(eventData);

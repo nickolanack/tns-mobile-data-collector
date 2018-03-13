@@ -8,7 +8,9 @@ var fs;
 var configurationName;
 
 
-
+var _isArray = function(thing) {
+	return Object.prototype.toString.call(thing) === "[object Array]";
+}
 
 
 var saveImage = function(name, imgSource) {
@@ -269,6 +271,23 @@ Configuration.prototype.getConfiguration = function(name) {
 
 }
 
+
+Configuration.prototype.extendDefaultParameters = function(data) {
+
+	var me=this;
+
+	if (!me._defaultConfig) {
+		throw 'Configuration not set';
+	}
+
+
+	Object.keys(data).forEach(function(k) {
+		me._defaultConfig.parameters[k]=data[k];
+	});
+
+}
+
+
 Configuration.prototype.getIncludes = function(config) {
 	var me = this;
 	if (config.parameters.includes) {
@@ -396,6 +415,11 @@ Configuration.prototype.get = function(name, defaultValue) {
 Configuration.prototype.getIcon = function(name, urlPath) {
 
 	var me = this;
+
+	
+	if(_isArray(name)&&typeof name[0]=='string'){
+		name=name[0];
+	}
 
 
 	var getLocalIconPromise = function() {
