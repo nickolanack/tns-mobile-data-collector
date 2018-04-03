@@ -31,6 +31,7 @@ var SocialShare;
 var PullToRefresh;
 
 var textViewModule;
+var activityIndicatorModule;
 
 
 function ViewRenderer() {
@@ -39,6 +40,9 @@ function ViewRenderer() {
 
 	labelModule = require("ui/label");
 	textFieldModule = require("ui/text-field");
+
+
+	activityIndicatorModule = require("ui/activity-indicator");
 
 	textViewModule = require("ui/text-view");
 	listPickerModule = require("ui/list-picker");
@@ -80,6 +84,11 @@ ViewRenderer.SharedInstance = function() {
 }
 
 
+
+
+
+
+
 try {
 
 	var observableModule = require("data/observable");
@@ -105,6 +114,16 @@ ViewRenderer.prototype.currentView = function() {
  */
 ViewRenderer.prototype.setDefaultStyle=function(styleUrl){
 	this._styleUrl=styleUrl;
+}
+
+
+ViewRenderer.prototype.once=function(name, event){
+	var me=this;
+	var fn=function(){
+		me.removeEventListener(name, fn);
+		event.apply(null, arguments);
+	}
+	me.on(name, fn)
 }
 
 ViewRenderer.prototype._renderDefaultStyle=function(){
@@ -369,7 +388,7 @@ ViewRenderer.prototype._addClass = function(el, className) {
 
 			if (last.length) {
 				var diff = me._arrayDiff(last, current);
-				console.log("Removing Classname Diff: " + JSON.stringify(last) + ' ' + JSON.stringify(current) + ' -> ' + JSON.stringify(diff));
+				console.log("Removing Classname Diff `"+className+"`: " + JSON.stringify(last) + ' ' + JSON.stringify(current) + ' -> ' + JSON.stringify(diff));
 				me._removeClass(el, diff);
 			}
 
@@ -531,6 +550,17 @@ ViewRenderer.prototype._createText = function(field) {
 
 	var label = new labelModule.Label();
 	me._bind(field.value, function(value) {
+
+		if(field.placeholder){
+			if((!value)||value==""){
+				label.text=field.placeholder;
+				me._addClass(label, 'placeholder-text')
+				return;
+			}else{
+				me._removeClass(label, 'placeholder-text')
+			}
+		}
+
 		label.text = value
 	});
 
@@ -644,18 +674,17 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 
 	me._app().requireAccessToGPS().then(function(geolocation) {
 
+		var currentWatchObserverNumber=null;
+
+		me.once('pop',function(){
+			console.log('Clear Geolocation Interval');
+			geolocation.clearWatch(currentWatchObserverNumber);		
+		})
 		console.log('Requesting location');
 
-		geolocation.getCurrentLocation({ desiredAccuracy: Accuracy.high, maximumAge: 5000, timeout: 20000 }).then(function(loc){
-			if (loc) {
-				console.log("Current location is: " + JSON.stringify(loc));
-				model.set(field.name, [loc.latitude, loc.longitude, loc.altitude]);
-			}
-		}).catch(function(e){
-			console.log("Location Error: "+JSON.stringify(e.message||e))
-		});
+		
 
-		var watchObserverNumber=geolocation.watchLocation(
+		currentWatchObserverNumber=geolocation.watchLocation(
 			function(loc) {
 
 				if (loc) {
@@ -668,11 +697,21 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 				console.log("Location Error: " + JSON.stringify(e.message||e));
 				//getLocation();
 			}, {
-				desiredAccuracy: Accuracy.high,
-				updateDistance: 10,
+				desiredAccuracy: Accuracy.any,
+				updateDistance: 1,
 				minimumUpdateTime: 1000 * 10
 			});
 
+
+
+		geolocation.getCurrentLocation({ desiredAccuracy: Accuracy.high, maximumAge: 5000, timeout: 20000 }).then(function(loc){
+			if (loc) {
+				console.log("Current location is: " + JSON.stringify(loc));
+				model.set(field.name, [loc.latitude, loc.longitude, loc.altitude]);
+			}
+		}).catch(function(e){
+			console.log("Location Error: "+JSON.stringify(e.message||e))
+		});
 
 	}).catch(function(e){
 		console.log("Location Error: "+JSON.stringify(e.message||e))
@@ -763,9 +802,10 @@ ViewRenderer.prototype.cancel = function() {
 
 
 
-var renderTextField = function(container, field, model) {
+ViewRenderer.prototype.renderTextField = function(container, field) {
 
-
+	var me=this;
+	var model=me._model;
 
 	var textfield = new textFieldModule.TextField();
 
@@ -794,15 +834,19 @@ var renderTextField = function(container, field, model) {
 	container.addChild(textfield);
 
 }
-var renderTextFieldArea = function(container, field, model) {
+ViewRenderer.prototype.renderTextFieldArea = function(container, field) {
 
 
+	var me=this;
+	var model=me._model;
 
 	var textfield = new textViewModule.TextView();
 
 	textfield.returnKeyType='done';
 
-	textfield.hint = field.placeholder;
+	if(field.placeholder){
+		textfield.hint = field.placeholder;
+	}
 
 	instance._addClass(textfield, "textfield")
 	var bindingOptions = {
@@ -1004,7 +1048,9 @@ var renderImage = function(container, field) {
 
 	var gestures = require("ui/gestures");
 	image.on(gestures.GestureTypes.pinch, function(args) {
-		console.log("Pinch Scale: " + JSON.stringify(args));
+		console.log("Pinch Scale: " + JSON.stringify(Object.keys(args)));
+		console.log("Pinch Scale `scale`: " + JSON.stringify(args.scale));
+		console.log("Pinch Scale `state`: " + JSON.stringify(Object.keys(args.state)));
 	});
 
 
@@ -1037,8 +1083,9 @@ ViewRenderer.prototype._createImage = function(field) {
 	}
 
 	if (typeof url == 'string' && url.indexOf('{') >= 0) {
+		var before=url;
 		url = me._parse(url);
-		console.log('Variable Image: ' + src);
+		console.log('Variable Image: ' +before+"=>"+ url);
 
 
 	}
@@ -1064,37 +1111,76 @@ ViewRenderer.prototype._createImage = function(field) {
 
 
 
-	if (src[0] !== "~") {
+	if (src[0] !== "~"&&src.indexOf('http')!==0) {
 		src = global.client.getProtocol() + '://' + global.client.getUrl() + "/" + src;
 	}
 
 
 
-	if (field.size && src.indexOf('https://') === 0) {
-		src = me._getImageThumb(src, field);
-	}
+	
+	src = me._getImageThumb(src, field);
+
+	
 
 
+
+
+	console.log('Set image: ' + src);
 	var image = new imageModule.Image();
-	console.log('set image: ' + src);
-	image.src = src;
+	image.src = encodeURI(src);
+
+	src=me._getCachedImage(src, image);
+
 	return image;
+
+}
+ViewRenderer.prototype._getCachedImage = function(url, image) {
+	var me=this;
+
+	if(url.indexOf(global.client.getProtocol() + '://') === 0){
+
+		var config=me._config();
+		var hasImage=config.hasCachedImage(url);
+
+		config.getImage(url, url).then(function(path){
+
+			image.src=path;
+
+
+		}).catch(function(err){
+			console.log('Error caching url: '+JSON.stringify(err)+' '+url);
+		});
+
+		if(hasImage){
+			return config.cachedImagePath(url);
+		}
+
+
+	}
+	return url;
 }
 
 
+ViewRenderer.prototype._getImageThumb = function(url, field) {
 
-ViewRenderer.prototype._getImageThumb = function(url, size) {
-	if (size.size) {
-		size = size.size;
+
+	if(field.size && url.indexOf(global.client.getProtocol() + '://') === 0){
+
+
+		var size = field.size;
+		return url.split('?')[0] + '?thumb=' + size.w + 'x' + size.h;
+
+
 	}
 
-	return url.split('?')[0] + '?thumb=' + size.w + 'x' + size.h;
+	return url;
+
 
 }
 
 
 
-ViewRenderer.prototype.renderButtonset = function(container, field, model) {
+ViewRenderer.prototype.renderButtonset = function(container, field) {
 
 	var me = this;
 
@@ -1570,6 +1656,13 @@ ViewRenderer.prototype._pushSubform = function(name, callback) {
 	me._viewNames.push(me._viewName);
 
 	me._pushSubformData(name, callback);
+
+
+	var eventData = {
+		eventName: 'push',
+		object: me
+	};
+	me.notify(eventData);
 };
 ViewRenderer.prototype._popSubform = function(name, callback) {
 	var me = this;
@@ -1582,14 +1675,22 @@ ViewRenderer.prototype._popSubform = function(name, callback) {
 	me._model = me._models.pop();
 	me._viewName=me._viewNames.pop();
 	me._popSubformData();
+
+
+	var eventData = {
+		eventName: 'pop',
+		object: me
+	};
+	me.notify(eventData);
+
 };
 
 
 
-ViewRenderer.prototype.renderForm = function(container, field, model) {
+ViewRenderer.prototype.renderForm = function(container, field) {
 
 	var me = this;
-
+	var model=this._model;
 
 	var button = me.renderButton(container, {
 		label: field.label
@@ -1809,6 +1910,31 @@ ViewRenderer.prototype.renderLayout = function(container, field) {
 
 }
 
+
+ViewRenderer.prototype.renderSpinner = function(container, field) {
+
+
+	if(field.condition){
+		return this._renderConditionalFieldset(container, {
+			"type":"fieldset",
+			"condition":field.condition,
+			"fields":[{
+				"type":"spinner"
+			}]
+		})
+	}
+
+	var indicator = new activityIndicatorModule.ActivityIndicator();
+	indicator.width = 100;
+	indicator.height = 100;
+
+	indicator.busy=true;
+
+	container.addChild(indicator);
+
+	return indicator;
+}
+
 ViewRenderer.prototype._renderConditionalFieldset = function(container, field) {
 	var me = this;
 
@@ -1941,7 +2067,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 		if (container !== defaultParentNode) {
 			var eventName = "insertAt" + field.position[0].toUpperCase() + field.position.split('-').shift().substring(1);
-			console.log('Insert Event: ' + eventName);
+			//console.log('Insert Event: ' + eventName);
 
 			var eventData = {
 				eventName: eventName,
@@ -1960,7 +2086,10 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	if (field.condition && field.type != 'fieldset') {
 
 		var show=me._parse(field.condition);
-		console.log('Render conditional Field: '+field.condition+' :'+(show?"show - ":"!show - ")+show);
+		console.log('Render Conditional Field: '+field.condition+' :'+(show?"show: true":"!show: false"));
+		if(show===field.condition&&(typeof show==string&&show.indexOf('{'))>=0){
+			console.log('Conditional Field Failed to resolve: '+show);
+		}
 		if (!show) {
 			return null;
 		}
@@ -1971,12 +2100,10 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 	if (field.type == 'heading') {
 		return renderHeading(container, field, model);
-
 	}
 
 	if (field.type == 'label') {
 		return renderLabel(container, field, model);
-
 	}
 
 	if (field.type == 'media') {
@@ -1985,7 +2112,6 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 
 	if (field.type == 'audiorecorder') {
-
 		return me.renderAudioRecorder(container, field);
 	}
 	if (field.type == 'audio') {
@@ -2002,11 +2128,16 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 
 	if (field.type == 'textfield') {
-		return renderTextField(container, field, model);
+		return me.renderTextField(container, field);
 	}
 	if (field.type == 'textarea') {
-		return renderTextFieldArea(container, field, model);
+		return me.renderTextFieldArea(container, field);
 	}
+
+	if (field.type == 'spinner') {
+		return me.renderSpinner(container, field);
+	}
+
 
 	if (field.type == 'optionlist') {
 		return renderOptionList(container, field, model);
@@ -2105,9 +2236,11 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 		if(!_isObject(field.data)){
 			throw 'Expected field.data to exist and be an object: '+JSON.stringify(field, null, '   ');
 		}
+
+		var data=me._parse(field.data);
 		Object.keys(field.data).forEach(function(k) {
-			console.log('add form data: ' + k + ' ' + field.data[k]);
-			var value=me._parse(field.data[k]);
+			console.log('add form data: ' + k + ' ' + data[k]);
+			var value=data[k];
 
 			model.set(k, value);
 		});
@@ -2179,12 +2312,14 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 	page.on('navigatedTo', function(arg) {
 		console.log('Navigated To ' + JSON.stringify(Object.keys(arg)));
+		console.log('Navigated To... Check For Back Click: ' + JSON.stringify(arg.isBackNavigation));
+
 	})
 	page.on('navigatedFrom', function(arg) {
-		console.log('Navigated From' + JSON.stringify(Object.keys(arg)));
-		console.log('Navigated From' + JSON.stringify(arg.context));
-		console.log('Navigated From' + JSON.stringify(arg.isBackNavigation));
-		console.log('Navigated From' + JSON.stringify(Object.keys(arg.object)));
+		//console.log('Navigated From' + JSON.stringify(Object.keys(arg)));
+		//console.log('Navigated From' + JSON.stringify(arg.context));
+		console.log('Navigated From... Check For Back Click: ' + JSON.stringify(arg.isBackNavigation));
+		//console.log('Navigated From' + JSON.stringify(Object.keys(arg.object)));
 
 		if (arg.isBackNavigation) {
 			me._clearUpdateIntervals();
@@ -2194,7 +2329,7 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 
 	model.on(require("data/observable").Observable.propertyChangeEvent, function(data) {
-		console.log('on ' + data.propertyName + ' changed: ' + JSON.stringify(data.value));
+		console.log('Model Data Event: `' + data.propertyName + '`: ' + JSON.stringify(data.value));
 		// console.log('Property Changed '+JSON.stringify(data));
 		// console.log('Properties '+JSON.stringify(page.bindingContext));
 	});

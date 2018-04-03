@@ -42,7 +42,7 @@ Messages.prototype.connect=function(){
 	
 
 
-	pusher.connect().then(() => {
+	pusher.connect().then(function() {
 	  console.log('Pusher Connected Successfully');
 	  me.pusher=pusher;
 
@@ -54,12 +54,12 @@ Messages.prototype.connect=function(){
 	  	delete me._queue;
 	  }
 
-	}).catch(error => {
+	}).catch(function(error) {
 	  console.log("Pusher Error Connect:"+JSON.stringify({
 	  	"pusherAppChannelPrefix":params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.',
 	  	"pusherAppKey":params.pusherAppKey
-	  }));
-	  console.log(error);
+	  })+": "+JSON.stringify(error));
+
 	});
 
 	console.log('Pusher connecting.');
@@ -120,11 +120,10 @@ Messages.prototype._subscribe = function(channel, event, callback) {
 	var eventName = event;
 	 
 	console.log('Channel subscription and event binding attempting: '+channel+' '+event);
-	me.pusher.subscribe(channelTypeAndName, eventName, publicChannelEventsListeners).then(() => {
+	me.pusher.subscribe(channelTypeAndName, eventName, publicChannelEventsListeners).then(function() {
 	  console.log('Channel subscription and event binding succeeded');
-	}).catch(error => {
-	  console.log("Pusher Error Subscribe");
-	  console.log(error);
+	}).catch(function(error){
+		console.log("Pusher Error Subscribe: "+JSON.stringify(error));
 	})
 	 
 

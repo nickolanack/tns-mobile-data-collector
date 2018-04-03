@@ -28,12 +28,11 @@ var saveImage = function(name, imgSource) {
 
 var imagePath = function(name) {
 
-
 	if(typeof name !="string"){
 		throw 'Invalid imagePath name: '+(typeof name)+" "+JSON.stringify(name);
 	}
 
-	name=name.split('/').join('.');//.split('[').join('_').split(']').join('_');
+	name=name.split('/').join('.'); // .split('[').join('_').split(']').join('_');
 
 	var folder = fs.knownFolders.temp();
 	var path = fs.path.join(folder.path, name + ".png");
@@ -136,6 +135,8 @@ function Configuration(client) {
 	me._configs = {};
 
 
+	me._refreshDate=(new Date()).valueOf();
+
 	if(instance){
         throw 'Singleton class instance has already been created! use Configuration.SharedInstance()';
     }
@@ -151,7 +152,13 @@ Configuration.SharedInstance=function(){
     return instance;
 }
 
+Configuration.prototype.hasCachedImage = function(name) {
+	return hasImage(name);
+}
 
+Configuration.prototype.cachedImagePath = function(name) {
+	return imagePath(name);
+}
 
 Configuration.prototype.hasConfiguration = function(name) {
 	return hasConfig(name);
@@ -227,8 +234,7 @@ Configuration.prototype.getConfiguration = function(name) {
 			});
 		}
 
-		if (hasConfig(name) && (!me._refreshCacheItems)) {
-
+		if (!me._refreshCacheItem(name)) {
 			resolveLocalConfig();
 			return;
 		}
@@ -271,6 +277,11 @@ Configuration.prototype.getConfiguration = function(name) {
 
 }
 
+Configuration.prototype._refreshCacheItem = function(name) {
+	var me=this;
+	return (!hasConfig(name)) || (me._refreshCacheItems&&me.getLocalDataModifiedDate(name)<me._refreshDate);
+
+}
 
 Configuration.prototype.extendDefaultParameters = function(data) {
 
@@ -431,7 +442,7 @@ Configuration.prototype.getIcon = function(name, urlPath) {
 	}
 
 
-	if (hasImage(name) && (!me._refreshCacheItems)) {
+	if (!me._refreshCacheItem(name)) {
 		return getLocalIconPromise();
 	}
 
@@ -500,7 +511,7 @@ Configuration.prototype.getImage = function(name, urlPath) {
 		});
 	}
 
-	if (hasImage(name) && (!me._refreshCacheItems)) {
+	if (!me._refreshCacheItem(name)) {
 		return getLocalImagePromise();
 	}
 
@@ -577,7 +588,7 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 		});
 	}
 
-	if (hasStyle(name) && (!me._refreshCacheItems)) {
+	if (!me._refreshCacheItem(name)) {
 		return getLocalStylePromise();
 	}
 

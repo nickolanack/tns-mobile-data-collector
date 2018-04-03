@@ -11,6 +11,11 @@ var bghttp;
 
 var instance; //Deprecated! 
 
+
+var _isArray = function(thing) {
+    return Object.prototype.toString.call(thing) === "[object Array]";
+}
+
 function DataAcquisitionApplication(client, params) {
 
     var me = this;
@@ -281,11 +286,24 @@ DataAcquisitionApplication.prototype.isOnline = function() {
 DataAcquisitionApplication.prototype._setOnline = function() {
     var me = this;
     me._online = true;
+    if(me._processOfflineIterval){
+        clearInterval(me._processOfflineIterval);
+        me._processOfflineIterval=setInterval(function(){
+
+             me._processOfflineForms();
+
+        }, 60*1000);
+    }
     me._processOfflineForms();
 }
 
 DataAcquisitionApplication.prototype._setOffline = function() {
     var me=this;
+
+    if(me._processOfflineIterval){
+        clearInterval(me._processOfflineIterval);
+    }
+
     me._online = false;
 }
 
@@ -295,27 +313,33 @@ DataAcquisitionApplication.prototype._processOfflineForms = function() {
 
     var me = this;
 
-    var list = me._offlineFormPaths();
+    me.getQueuedForms().then(function(list){
 
-    console.log('Process Offline Forms: ' + list.length);
+        console.log('Process Offline Forms: ' + list.length);
 
-    if (list.length) {
+        if (list.length) {
 
 
-        var mult = list.length > 1;
-        me.getMessageManager().alert({
-            title: "Sending Offline Forms",
-            "message": "There " + (mult ? "are " : "is ") + list.length + " offline form" + (mult ? "s" : "") + " to submit"
-        }).then(function() {
-            console.log("Dialog closed!");
-            var sendNext = function() {
-                if (list.length) {
-                    me._processFormFilePath(list.shift(), null, sendNext);
+            var mult = list.length > 1;
+            me.getMessageManager().alert({
+                title: "Sending Offline Forms",
+                "message": "There " + (mult ? "are " : "is ") + list.length + " offline form" + (mult ? "s" : "") + " to submit"
+            }).then(function() {
+                console.log("Dialog closed!");
+                var sendNext = function() {
+                    if (list.length) {
+                        me._processFormFilePath(list.shift()._path, null, sendNext);
+                    }
                 }
-            }
-            sendNext();
-        });
-    }
+                sendNext();
+            });
+        }
+
+    }).catch(function(e){
+        console.log('Error getting list of queued items: '+JSON.stringify(e.message||e));
+    });
+
+    
 
 };
 DataAcquisitionApplication.prototype._offlineFormPaths = function() {
@@ -340,6 +364,8 @@ DataAcquisitionApplication.prototype._offlineFormPaths = function() {
 
 };
 
+
+
 DataAcquisitionApplication.prototype.getQueuedForms = function() {
 
     var me = this;
@@ -358,19 +384,40 @@ DataAcquisitionApplication.prototype.getQueuedForms = function() {
 
         var check = function() {
             if (errors + forms.length == paths.length) {
-                resolve(forms);
+
+                var queueable=me._config().get('queuableForms', null);
+                if(_isArray(queueable)){
+
+                     resolve(forms.filter(function(f){
+                        return queueable.indexOf(f._formName)>=0;
+                     }));
+
+                     var invalidForms=forms.filter(function(f){
+                        return queueable.indexOf(f._formName)<0;
+                     });
+
+                     me._cleanUpInvalidForms(invalidForms);
+
+                }else{
+                    resolve(forms);
+                }
+
+                
             }
         }
 
         paths.forEach(function(path) {
             me._getFormFileData(path).then(function(data) {
 
+
+
+
                 forms.push(data);
                 check();
 
 
             }).catch(function(err) {
-                console.log('getQueuedForms Error');
+                console.log('getQueuedForms Error: '+JSON.stringify(err.message||err));
                 errors++;
                 check();
             })
@@ -379,6 +426,10 @@ DataAcquisitionApplication.prototype.getQueuedForms = function() {
 
     });
 }
+
+DataAcquisitionApplication.prototype._cleanUpInvalidForms = function(forms) {
+    console.log('Should clean up invalid forms: '+JSON.stringify(forms));
+};
 
 
 DataAcquisitionApplication.prototype._processFormFile = function(filename, countItems, callback) {
@@ -472,7 +523,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 
             }).catch(function(err) {
-                console.error('Image Upload Error => ' + err.message);
+                console.error('Image Upload Error => ' + JSON.stringify(err.message||err));
                 callback(err);
             })
             return;
@@ -617,7 +668,7 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
     }
 
     var session = bghttp.session("media-upload");
-
+    //var url='http://postb.in/HrtEpOOe';
     var request = {
         url: url,
         method: method,
@@ -625,42 +676,70 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
             "Content-Type": "application/octet-stream",
             "File-Name": filename
         },
-        description: "{ 'uploading': " + filename + " }"
+        description: "{ 'uploading': " + filename + " }",
+       // androidDisplayNotificationProgress:false
     };
 
 
-    console.log('Generating Promise');
+    console.log('Generating Promise For File Upload');
 
     console.log("about to upload: " + filePath);
-    var task = session.uploadFile(filePath, request);
+    var params = [
+            { name: "upload", filename: filePath, mimeType: 'image/png' }
+        ];
+    var task = session.multipartUpload(params, request);
+
+    if(!me._tasks){
+        me._tasks=[];
+    }
+    me._tasks.push(task);
+    if(!me._sessions){
+        me._sessions=[];
+    }
+    me._sessions.push(session);
+   
+
+
+    me._taskIndicatorStart(finished, total);
 
     return new Promise(function(resolve, reject) {
 
 
-        console.log('Executing Promise');
+        console.log('Executing Promise For File Upload');
 
 
-        me._taskIndicatorStart(finished, total);
+        
 
         task.on("progress", function(value) {
-            console.log("progress: " + JSON.stringify(value));
-            console.log("progress: " + (100 * parseInt(value.currentBytes) * (finished + 1)) / (parseInt(value.totalBytes) * total));
-            me._taskIndicatorProgress('Uploading ' + (finished + 1) + " of " + total, (100 * parseInt(value.currentBytes) * (finished + 1)) / (parseInt(value.totalBytes) * total));
+            console.log("Upload Progress: " + JSON.stringify(value));
+            
+            var percent=(100 * parseInt(value.currentBytes) * (finished + 1)) / (parseInt(value.totalBytes) * total);
+            console.log("Calculated: " + percent);
+            me._taskIndicatorProgress('Uploading ' + (finished + 1) + " of " + total, percent);
         });
         task.on("error", function(err) {
-            console.log("Error");
-            console.log(err.eventName);
+            console.log("Error Uploading File: "+JSON.stringify(err.eventName||err.message||e));
+            reject(err);
+            me._taskIndicatorComplete(finished + 1, total);
         });
         task.on("complete", function(response) {
-            console.log(JSON.stringify(response));
+            console.log("Upload Complete: "+JSON.stringify(response));
             me._taskIndicatorComplete(finished + 1, total);
         });
 
         task.on("responded", function(response) {
 
             console.log('Response: ' + response.data + " " + url);
-            var fileMeta = JSON.parse(response.data);
+            var fileMeta;
+            try{
+                fileMeta = JSON.parse(response.data);
+            }catch(err){
 
+                console.log('Upload Error => ' + JSON.stringify(err) + ' ' +response);
+                reject(err);
+
+                return;
+            }
 
 
             var fileMetaName = filename + '.json';
@@ -672,12 +751,13 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
                     console.log('stored: ' + fileMetaName + " => " + response.data);
                     resolve(fileMeta);
                 }).catch(function(err) {
-                    console.log('Error => ' + err.message);
+                    console.log('Upload Error => ' + JSON.stringify(err));
+                    reject(err);
                 });
 
         });
 
-    })
+    });
 
 }
 
@@ -751,6 +831,19 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
             me._processFormFile(file, null, function(err, response) {
                 if (err) {
 
+                    var queueable=me._config().get('queuableForms', null);
+                    if(_isArray(queueable)){
+                        if(queueable.indexOf(formName)<0){
+
+                            var eventData = {
+                                eventName: "submitFormError",
+                                object: me
+                            };
+                            callback(callbackData);
+                            me.notify(eventData);
+
+                        }
+                    }
 
                     var eventData = {
                         eventName: "submitFormFailed",
@@ -774,6 +867,20 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
             return;
         }
 
+        var queueable=me._config().get('queuableForms', null);
+        if(_isArray(queueable)){
+            if(queueable.indexOf(formName)<0){
+                var eventData = {
+                    eventName: "offlineFormError",
+                    object: me
+                };
+                callback(callbackData);
+                me.notify(eventData);
+
+                return;
+            }
+        }
+
         var eventData = {
             eventName: "queuedForm",
             object: me
@@ -789,7 +896,7 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
         clearHistory: true,
         //backstackVisible:false,
         context: {
-            form: require('../').Configuration.SharedInstance().get("mainView", "menu"),
+            form: me._config().get("mainView", "menu"),
             data: {
                 isSubmitting: true,
                 submittingStateLabel: "Uploading"

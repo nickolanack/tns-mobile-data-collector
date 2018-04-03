@@ -129,20 +129,44 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 		list=list.list;
 	}
 
+
+	var model=me._renderer._model;
+	model.set('listLoading', true);
+	
 	
 
 	var stack=me._renderer._createStack();
-	container.addChild(stack);
+
+	if(field.pullsToRefresh){
+		var pulltorefresh =new (require('nativescript-pulltorefresh').PullToRefresh)();
+		container.addChild(pulltorefresh);
+		pulltorefresh.content=stack;
+	}else{
+		container.addChild(stack);
+	}
+	
+
+
+
 	me._renderer._addClass(stack, "list");
 	me._renderer._addClass(stack, field);
+
+
+
+	me._renderer._renderFields(stack, {
+		
+		"condition":"{data.listLoading|?}",
+		"type":"spinner"
+			
+	});
 
 	me._resolveList(list).then(function(list){
 
 		try{
 			console.log('Resolved list');
 
-			var model=me._renderer._model;
-		
+			
+			model.set('listLoading', false);
 			if(list&&list.length>0){
 				
 
@@ -168,7 +192,7 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 				console.log("fieldSetList: "+JSON.stringify(fieldSetList));
 				var listItemStack=me._renderer._createStack();
 				container.addChild(listItemStack);
-				var renderItemsFieldset=function(fieldSet){
+				var renderItemsFieldset=function(fieldSet, i){
 						
 
 
@@ -176,7 +200,11 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 						//console.log(JSON.stringify(fields, null, '   '));
 
 						try{
-
+							var listItem=list[i];
+							
+							me._renderer._config().extendDefaultParameters({"item-value":listItem});
+							var preparsedFields=me._parseLiterals(listItem, fields);
+							
 							me._renderer._renderFields(stack, fields);
 
 						}catch(e){
@@ -231,7 +259,7 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 	
 
 
-	
+	return pulltorefresh;
 
 }
 

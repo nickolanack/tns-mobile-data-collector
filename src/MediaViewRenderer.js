@@ -80,6 +80,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 		me._renderer._model.set(field.name, imageAssets);
 	}
 
+	me._renderer._model.set(field.name+'-at-limit', false);
 	
 
 	if (mediaOptions.showImage || mediaOptions.showVideo) {
@@ -134,7 +135,6 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 								imageAssets.splice(i, 1);
 								me._renderer._model.set(field.name, imageAssets);
 
-
 								if (field.required && imageAssets.length == 0) {
 									addPhoto();
 								}
@@ -148,6 +148,11 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 			var addPhoto = function() {
 
+
+				if(field.limit&&imageAssets.length>=field.limit){
+					console.log('Media Limit Reached (photo): '+imageAssets.length);
+					return;
+				}
 
 				camera.takePicture({
 						cameraFacing:(!!field.selfie)?"front":"back",
@@ -167,6 +172,13 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 
 			var addVideo = function() {
+
+
+				if(field.limit&&imageAssets.length>=field.limit){
+					console.log('Media Limit Reached (video): '+imageAssets.length);
+					return;
+				}
+
 
 				console.log("add video");
 				var video = require("nativescript-videorecorder");
@@ -297,7 +309,10 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 	var showAddAudioView = function() {
 
-
+		if(field.limit&&imageAssets.length>=field.limit){
+			console.log('Media Limit Reached (audio): '+imageAssets.length);
+			return;
+		}
 
 		me._renderer._showSubform({
 			"className": "submit",
@@ -446,9 +461,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			}
 		}
 
-
 		if (!hideButton()){
-
 
 			var buttons = [];
 			me._renderer.renderField(mediaSelection, extend({
@@ -463,10 +476,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			}))
 		}
 
-
 	}
-
-
 
 }
 
@@ -606,8 +616,6 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 					me._renderer._player = new TNSPlayer();
 				}
 
-
-
 				me._renderer._player.playFromFile({
 					audioFile: filepath, // ~ = app directory
 					loop: false,
@@ -629,9 +637,8 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 
 					});
 				});
-
-
 			}
+
 		}, {
 			"icon": "remove-media",
 			"label": "Remove",

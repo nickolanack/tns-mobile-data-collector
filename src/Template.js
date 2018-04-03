@@ -16,16 +16,16 @@ Template.SetJsonPath=function(path){
 
 
 Template.prototype.hasTemporalFormatter = function(str) {
-
-	return str.indexOf('|dateFromNow}')>0||str.indexOf('now')>0
+	
+	return str.indexOf('|dateFromNow}')>0||str.indexOf('{now')>=0;
 
 }
 
-Template.prototype._format = function(data, formatters) {
+Template.prototype._format = function(variable, formatters) {
 
 
 
-
+	var data=variable;
 
 
 
@@ -145,6 +145,11 @@ Template.prototype._format = function(data, formatters) {
 		if (format === "kebab") {
 			data = data.toLowerCase().split(' ').join('-');
 		}
+		if (format === "capitalize") {
+			data = data.toLowerCase().split(' ').map(function(s){
+				return s[0].toUpperCase()+s.slice(1);
+			}).join(' ');
+		}
 		if (format === "snake") {
 			data = data.toLowerCase().split(' ').join('_');
 		}
@@ -218,6 +223,10 @@ Template.prototype._format = function(data, formatters) {
 					
 				}	
 				data=moment(data).format('LTS');
+			}
+
+			if(data==='Invalid date'){
+				console.log('Template Invalid Date: '+variable)
 			}
 		}catch(e){}
 
