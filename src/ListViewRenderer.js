@@ -208,7 +208,8 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 							me._renderer._renderFields(stack, fields);
 
 						}catch(e){
- 							console.log('Some List Error: '+e+ JSON.stringify(fields, null, '   '));
+ 							console.log('Some List Item Render Error: '+e+ JSON.stringify(fields, null, '   '));
+ 							console.error(e);
 						}
 
 					
@@ -251,10 +252,12 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 
 		}catch(e){
 			console.log('Some List Error: '+e)
+			console.error(e);
 		}
 
 	}).catch(function(e){
 		console.log('List Error: '+e);
+		console.error(e);
 	});
 	
 

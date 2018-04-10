@@ -136,6 +136,12 @@ Template.prototype._format = function(variable, formatters) {
 		}
 
 
+		if(format.indexOf('trim')===0){
+
+			data=data.trim();		
+
+		}
+
 		if (format === "lower") {
 			data = data.toLowerCase();
 		}

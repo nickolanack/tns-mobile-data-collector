@@ -959,8 +959,10 @@ ViewRenderer.prototype.renderButton = function(container, field) {
 
 
 
-var renderIconselect = function(container, field, model) {
+ViewRenderer.prototype.renderIconselect = function(container, field) {
 
+
+	var me = this;
 
 	var buttons = [];
 	var clearSelected = function() {
@@ -973,6 +975,9 @@ var renderIconselect = function(container, field, model) {
 
 	instance._addClass(wrapLayout, "iconselect");
 	container.addChild(wrapLayout);
+
+
+	var initialValue=me._model.get(field.name)||field.value;
 
 	instance._parse(field.icons, field.template).forEach(function(icon) {
 
@@ -1006,12 +1011,12 @@ var renderIconselect = function(container, field, model) {
 
 		var selectIcon = function() {
 			console.log('set:' + field.name + ' -> ' + icon.icon);
-			model.set(field.name, icon.value);
+			me._model.set(field.name, icon.value);
 			clearSelected();
 			instance._addClass(stackLayout, "selected");
 
 		};
-		if (icon.value == field.value) {
+		if (icon.value == initialValue) {
 			selectIcon();
 		}
 
@@ -1750,7 +1755,14 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 	 * Note: I'm carefully allowing field to pass through withough making sure it is completely disconnected from 
 	 * any object references (using json) so that functions are not lost. (audio picker...)
 	 */
+	
+
 	var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
+
+	if(contextOptions.data){
+		contextOptions.data=me._parse(contextOptions.data);
+	}
+
 	if (field.name) {
 		contextOptions.form = contextOptions.form || field.name;
 
@@ -2087,7 +2099,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 		var show=me._parse(field.condition);
 		console.log('Render Conditional Field: '+field.condition+' :'+(show?"show: true":"!show: false"));
-		if(show===field.condition&&(typeof show==string&&show.indexOf('{'))>=0){
+		if(show===field.condition&&(typeof show=="string"&&show.indexOf('{'))>=0){
 			console.log('Conditional Field Failed to resolve: '+show);
 		}
 		if (!show) {
@@ -2147,7 +2159,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 
 	if (field.type == 'iconselect') {
-		return renderIconselect(container, field, model);
+		return me.renderIconselect(container, field);
 
 	}
 

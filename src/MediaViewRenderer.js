@@ -286,6 +286,25 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 					}
 
 				}));
+
+
+				me._renderer.renderField(mediaSelection, extend({
+
+					type:"button",
+					label: mediaOptions.labelForImage,
+					className: "add-photo library"
+					
+				}, field.imageButton||field.button, {
+
+					action: function() {
+						
+					}
+
+				}));
+
+
+
+
 			}
 
 			if (mediaOptions.showVideo && (!hideButton())) {

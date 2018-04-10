@@ -122,6 +122,7 @@ console.log(template.renderLiterals({"description":"<img src=\"components/com_ge
 
 console.log(template.renderLiterals('{image}',{"image":[1,2,3]}));
 
+console.log('`'+template.render("{` Snow and Ice `|split(-)|pop|trim}")+'`');
 
 //console.log(template.render('{{`<img src="components/com_geolive/users_files/user_files_305/Uploads/fSo_[ImAgE]_cJn_9An_[G].png" />`|images}.length|?}'));
 

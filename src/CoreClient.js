@@ -264,7 +264,7 @@ CoreAppClient.prototype.request = function(options, data) {
            	try{
 				var obj = JSON.parse(content);
 			}catch(e){
-				console.error('Request Json Error: '+JSON.stringify(options)+' '+content);
+				console.error('Request Json Error: '+JSON.stringify(options)+' '+content+' sent: '+JSON.stringify(data));
 				reject(e+": "+content);
 				return;
 			}
@@ -401,7 +401,22 @@ CoreAppClient.prototype.setReconnectFunction = function(fn) {
 	me._reconnectFunction=fn;
 }
 
+CoreAppClient.prototype.relogin=function(){
+	var me=this;
+	if(!me._reconnectFunction){
+		throw 'Cannot attempt relogin yet';
+	}
+	me._reconnectFunction().then(function(){
 
+			var eventData = {
+				eventName: "wentOnline",
+				object: me
+
+			};
+			me.notify(eventData);
+
+		});
+}
 CoreAppClient.prototype.login = function(username, password) {
 	var me = this;
 
@@ -410,7 +425,7 @@ CoreAppClient.prototype.login = function(username, password) {
 	if(me.shouldAttemptReconnect){
 		me.setReconnectFunction(function(){
 			return me.login(username, password);
-		})
+		});
 	}
 
 
