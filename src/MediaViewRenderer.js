@@ -54,7 +54,8 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 		labelForImage: "Add Image",
 		labelForVideo: "Add Video",
-		labelForAudio: "Add Audio"
+		labelForAudio: "Add Audio",
+		labelForImageLibrary:"Library"
 
 
 
@@ -287,20 +288,47 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 				}));
 
+				if(mediaOptions.showImageLibrary){
 
-				me._renderer.renderField(mediaSelection, extend({
+					me._renderer.renderField(mediaSelection, extend({
 
-					type:"button",
-					label: mediaOptions.labelForImage,
-					className: "add-photo library"
-					
-				}, field.imageButton||field.button, {
-
-					action: function() {
+						type:"button",
+						label: mediaOptions.labelForImageLibrary,
+						className: "add-photo library"
 						
-					}
+					}, field.libraryButton, {
 
-				}));
+						action: function() {
+							
+							var imagepicker = require("nativescript-imagepicker");
+							var context = imagepicker.create({
+							    mode: "single" // use "multiple" for multiple selection
+							});
+
+							context
+						    .authorize()
+						    .then(function() {
+						        return context.present();
+						    })
+						    .then(function(selection) {
+						        selection.forEach(function(imageAsset) {
+						            //console.log('Image Picker '+JSON.stringify(selected));
+						            renderImageAsset(imageAsset);
+						        });
+						        list.items = selection;
+						    }).catch(function (e) {
+						        console.log('Image Picker Error: '+JSON.stringify(e));
+						    });
+
+
+						}
+
+					}));
+
+
+				}
+
+				
 
 
 

@@ -16,7 +16,12 @@ function MapViewRenderer() {
 	imageSource = require("image-source");
 	permissions = require("nativescript-permissions");
 	application = require("application");
-	mapsModule = require("nativescript-google-maps-sdk");
+
+	try{
+		mapsModule = require("nativescript-google-maps-sdk");
+	}catch(e){
+		
+	}
 
 	var me = this;
 
