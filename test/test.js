@@ -1,27 +1,36 @@
+var Template = require('../').Template;
+var template = Template.SharedInstance();
 
-var Template=require('../').Template;
-var template=new Template();
+
+var assert = require('assert');
+
+//console.log(Object.keys(assert));
 
 
-var assert=require('assert');
 
-console.log(Object.keys(assert));
 
 assert.equal(
-	template.render("{hello} {world}", {hello:"Hello", world:"World"}), 
+	template.render("{hello} {world}", {
+		hello: "Hello",
+		world: "World"
+	}),
 	"Hello World"
-	);
+);
 
 assert.equal(
-	template.render("{name|kebab}", {name:"Hello World"}), 
+	template.render("{name|kebab}", {
+		name: "Hello World"
+	}),
 	"hello-world"
-	);
+);
 
 
 assert.equal(
-	template.render("{name|kebab}", {name:"Hello World"}), 
+	template.render("{name|kebab}", {
+		name: "Hello World"
+	}),
 	"hello-world"
-	);
+);
 
 
 //var terms=require('fs').readFileSync(__dirname+'/terms.txt').toString();
@@ -30,29 +39,70 @@ assert.equal(
 
 
 
-
-
-console.log("result: "+JSON.stringify(template.render(require(__dirname+'/list.json'), {}, {
-		"date":"{value.creationDate|dateFromNow}",
-		"icon":"{value.icon}",
-		"stack":[{
-				"type":"heading",
+assert.deepEqual(template.render(require(__dirname + '/list.json'), {}, {
+		"date": "{value.creationDate|dateFromNow}",
+		"icon": "{value.icon}",
+		"stack": [{
+				"type": "heading",
 				"value": "{value.name}"
-			},
-			{
-				"type":"label",
+			}, {
+				"type": "label",
 				"value": "{value.point.0}, {value.point.1}",
-				"className":"label"
-			},
-			{
-				"type":"image",
-				"image":"{{value.description|images}.0.url}",
-				"action":"view",
-				"view":"markerDetail",
-				"data":"{value}"
+				"className": "label"
+			}, {
+				"type": "image",
+				"image": "{{value.description|images}.0.url}",
+				"action": "view",
+				"view": "markerDetail",
+				"data": {
+					"id": "{value.id}",
+					"title": "{value.name|split(-)|slice(0,-1)|join(-)|trim}",
+					"description": "{value.description|stripTags|trim}",
+					"type": "{value.name|split(-)|pop|trim}",
+					"coordinates": ["{value.point.0}", "{value.point.1}", "{value.point.2}"],
+					"media": "{value.description|images|=>(url)}",
+					"media-audio": "{value.description|audios|=>(url)}",
+					"media-video": "{value.description|videos|=>(url)}"
+				}
 			}
-			
-		]}), null, '  '))
+
+		]
+	}),
+
+
+	[{
+		"date": "2017-11-20 15:45:54",
+		"icon": "components/com_geolive/users_files/user_files_20/Uploads/[ImAgE]_BmR_nvp_[G]_XFE.png?thumb=48x48",
+		"stack": [{
+			"type": "heading",
+			"value": "Wildlife"
+		}, {
+			"type": "label",
+			"value": "49.8427977, -119.6672336",
+			"className": "label"
+		}, {
+			"type": "image",
+			"image": "components/com_geolive/users_files/user_files_297/Uploads/[ImAgE]_XOg_J2W_[G]_PYM.png",
+			"action": "view",
+			"view": "markerDetail",
+			"data": {
+				"id": 51,
+				"title": "",
+				"description": "",
+				"type": "Wildlife",
+				"coordinates": [
+					49.8427977, -119.6672336,
+					0
+				],
+				"media": [
+					"components/com_geolive/users_files/user_files_297/Uploads/[ImAgE]_XOg_J2W_[G]_PYM.png"
+				],
+				"media-audio": [],
+				"media-video": []
+			}
+		}]
+	}]
+);
 
 
 // var moment = require('moment');
@@ -65,82 +115,92 @@ console.log("result: "+JSON.stringify(template.render(require(__dirname+'/list.j
 
 
 
-console.log(template.render('{someBool|?"cool":"not cool"}',{someBool:true}));
+assert.equal(template.render('{someBool|?"cool":"not cool"}', {
+	someBool: true
+}), 'cool');
 
 
 
-console.log(template.render('{someBool|?"http://true":"http://false"}',{someBool:false}));
+assert.equal(template.render('{someBool|?"http://true":"http://false"}', {
+	someBool: false
+}), "http://false");
 
 
 
-var _arrayDiff=function(a, b){
+var _arrayDiff = function(a, b) {
 
-	return a.filter(function(item){
-		return b.indexOf(item)<0;
+	return a.filter(function(item) {
+		return b.indexOf(item) < 0;
 	})
 
 }
-var  _arrayJoin=function(a, b){
+var _arrayJoin = function(a, b) {
 
-	return a.concat(b.filter(function(item){
-		return a.indexOf(item)<0;
+	return a.concat(b.filter(function(item) {
+		return a.indexOf(item) < 0;
 	}))
 
 }
 
-var _arrayUnique=function(a){
+var _arrayUnique = function(a) {
 
-	var o={};
-	a.forEach(function(item){
-		if(item&&item!=''){
-			o[item]='';
+	var o = {};
+	a.forEach(function(item) {
+		if (item && item != '') {
+			o[item] = '';
 		}
 	});
 	return Object.keys(o);
 
 }
 
-console.log(_arrayUnique(['a', 'b', 'b']));
-console.log(_arrayDiff(["preview-audio","hidden"],["preview-audio"]));
-console.log(_arrayJoin(['a', 'b'], ['c']));
+assert.deepEqual(_arrayUnique(['a', 'b', 'b']), ['a', 'b']);
+assert.deepEqual(_arrayDiff(["preview-audio", "hidden"], ["preview-audio"]), ["hidden"]);
+assert.deepEqual(_arrayJoin(['a', 'b'], ['c']), ['a', 'b', 'c']);
 
 
-console.log(template.render('{`'+Math.PI+'`|round(4)}'));
-
-
-
-console.log(template.render('{`<img src=\"components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png\" />`|images}'));
+assert.equal(template.render('{`' + Math.PI + '`|round(4)}'), 3.1416);
 
 
 
-console.log(template.render('{{img|images}.0.url|?}',{"img":'<img src=\"components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png\" />'}));
-
-console.log(template.render('{img|stripTags}',{"img":'Hello World<img src=\"components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png\" /> World'}));
-
-
-console.log(template.renderLiterals({"description":"<img src=\"components/com_geolive/users_files/user_files_305/Uploads/fSo_[ImAgE]_cJn_9An_[G].png\" />"},{},"{{value.description|images}.length|?}"));
-
-console.log(template.renderLiterals('{image}',{"image":[1,2,3]}));
-
-console.log('`'+template.render("{` Snow and Ice `|split(-)|pop|trim}")+'`');
-
-//console.log(template.render('{{`<img src="components/com_geolive/users_files/user_files_305/Uploads/fSo_[ImAgE]_cJn_9An_[G].png" />`|images}.length|?}'));
+assert.equal(template.render('{`<img src=\"components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png\" />`|images}')[0].html, '<img src="components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png" />');
 
 
 
+assert.equal(template.render('{{img|images}.0.url|?}', {
+	"img": '<img src=\"components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png\" />'
+}), true);
+
+assert.equal(template.render('{img|stripTags}', {
+	"img": 'Hello World<img src=\"components/com_geolive/users_files/user_files_388/Uploads/VaG_[ImAgE]_SfU_[G]_ynI.png\" /> World'
+}), 'Hello World  World');
+
+
+assert.equal(template.prepareTemplate({
+	"description": "<img src=\"components/com_geolive/users_files/user_files_305/Uploads/fSo_[ImAgE]_cJn_9An_[G].png\" />"
+}, {}, "{{value.description|images}.length|?}"), '{{`<img src="components/com_geolive/users_files/user_files_305/Uploads/fSo_[ImAgE]_cJn_9An_[G].png" />`|images}.length|?}');
+
+assert.equal(template.prepareTemplate('{image}', {
+	"image": [1, 2, 3]
+}),'{image}');
+
+
+template.addFormatter('_string',function(value){
+	return value+"";
+})
+
+assert.equal(template.render('{survey|_string}?tint={survey-color}', {
+	"survey-color":"rgb(1,2,3)",
+	"survey":["someUrl"],
+}), 'someUrl?tint=rgb(1,2,3)');
 
 
 
+//assert.equal('`' + template.render("{`Layer Name - Snow and Ice `|split(-)|pop|trim}") + '`', 'Snow and Ice');
+
+assert.equal(template.render('{{`<img src="components/com_geolive/users_files/user_files_305/Uploads/fSo_[ImAgE]_cJn_9An_[G].png" />`|images}.length|?}'), true);
+
+assert.equal(template.render("{`Layer Name - Snow and Ice `|split(-)|pop|trim}"), 'Snow and Ice');
 
 
-
-
-
-
-
-
-
-
-
-
-
+console.log('Success!');

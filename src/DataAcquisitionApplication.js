@@ -27,7 +27,7 @@ function DataAcquisitionApplication(client, params) {
     frameModule = require("ui/frame");
     dialogs = require("ui/dialogs");
     var Template = require('../').Template;
-    template = new Template();
+    template = Template.SharedInstance();
 
 
     bghttp = require("nativescript-background-http");
@@ -159,9 +159,7 @@ DataAcquisitionApplication.prototype.getMessageManager = function() {
 
     var Messages = require('../').Messages;
     var messages = new Messages(me.options.parameters);
-    setTimeout(function(){
-        messages.connect();
-    },4000);
+    
 
 
     me._messageManager = messages;
@@ -175,7 +173,7 @@ DataAcquisitionApplication.prototype._renderTemplate = function(template, data) 
     if (!me._template) {
 
         var Template = require('../').Template;
-        me._template = new Template();
+        me._template = Template.SharedInstance();
     }
 
 
@@ -531,7 +529,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 
 
-        console.log('About to save marker');
+        console.log('About to submit form');
         console.log(JSON.stringify(data));
         
         data["media-metadata-set"]=media.map(function(item) {
@@ -842,6 +840,7 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
                             callback(callbackData);
                             me.notify(eventData);
 
+                            return;
                         }
                     }
 

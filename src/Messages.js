@@ -14,13 +14,25 @@ function Messages(params) {
 	loaded=true;
 
 	dialogs = require("ui/dialogs");
-	Pusher = require("pusher-nativescript").Pusher;
-	IPublicChannelEventListener = require("pusher-nativescript/interfaces");
-
+	
 	var me=this;
 	me.params=params;
 
 
+	try{
+		Pusher = require("pusher-nativescript").Pusher;
+		IPublicChannelEventListener = require("pusher-nativescript/interfaces");
+
+		setTimeout(function(){
+	        me.connect();
+	    },4000);
+
+	}catch(e){
+		console.warn('Pusher error: will not be able to subscribe to events');
+    	console.error(e);
+	}
+
+	
 
 };
 Messages.prototype.connect=function(){

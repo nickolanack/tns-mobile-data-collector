@@ -109,7 +109,7 @@ ListViewRenderer.prototype.renderSplit = function(container, field) {
 
 	return gridLayout;
 }
-ListViewRenderer.prototype._parseLiterals = function(str, template, params) {
+ListViewRenderer.prototype._prepareTemplate = function(str, template, params) {
 
 	var me = this;
 
@@ -117,7 +117,7 @@ ListViewRenderer.prototype._parseLiterals = function(str, template, params) {
 		params = me._renderer._params();
 	}
 	
-	return me._renderer._getParser().renderLiterals(str, params, template);
+	return me._renderer._getParser().prepareTemplate(str, params, template);
 
 }
 
@@ -144,6 +144,8 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 	}else{
 		container.addChild(stack);
 	}
+
+
 	
 
 
@@ -185,27 +187,27 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 
 
 				if(field.before){
-					var fieldsBefore=me._parseLiterals({list:fieldSetList}, field.before);
+					var fieldsBefore=me._prepareTemplate({list:fieldSetList}, field.before);
 					me._renderer._renderFields(stack, fieldsBefore);
 				}
 
 				console.log("fieldSetList: "+JSON.stringify(fieldSetList));
 				var listItemStack=me._renderer._createStack();
-				container.addChild(listItemStack);
+				stack.addChild(listItemStack);
 				var renderItemsFieldset=function(fieldSet, i){
 						
 
 
-						var fields=me._parseLiterals(fieldSet, field.listItemFields);
+						var fields=me._prepareTemplate(fieldSet, field.listItemFields);
 						//console.log(JSON.stringify(fields, null, '   '));
 
 						try{
 							var listItem=list[i];
 							
 							me._renderer._config().extendDefaultParameters({"item-value":listItem});
-							var preparsedFields=me._parseLiterals(listItem, fields);
+							var preparsedFields=me._prepareTemplate(listItem, fields);
 							
-							me._renderer._renderFields(stack, fields);
+							me._renderer._renderFields(listItemStack, fields);
 
 						}catch(e){
  							console.log('Some List Item Render Error: '+e+ JSON.stringify(fields, null, '   '));

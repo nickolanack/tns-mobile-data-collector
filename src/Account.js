@@ -271,7 +271,8 @@ Account.prototype.login = function() {
 
 
 		}).catch(function(e) {
-			console.log('Failed: '+JSON.stringify(e));
+			console.log('Failed Login: '+JSON.stringify(e));
+			console.error(e);
 			reject(e);
 		});
 

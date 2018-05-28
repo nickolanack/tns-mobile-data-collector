@@ -153,7 +153,7 @@ ViewRenderer.prototype._getParser = function() {
 
 	if (!me._template) {
 		var Template = require('../').Template;
-		me._template = new Template();
+		me._template = Template.SharedInstance();
 	}
 	return me._template;
 }
@@ -720,6 +720,12 @@ ViewRenderer.prototype.renderLocation = function(container, field) {
 
 }
 
+
+ViewRenderer.prototype.renderOrientation = function(container, field) {
+
+		
+}
+
 var extend = function(a, b) {
 
 	b = b || {};
@@ -919,6 +925,10 @@ ViewRenderer.prototype.renderButton = function(container, field) {
 
 	var button = new buttonModule.Button();
 	//button.text = field.label;
+
+	if(!field.label){
+		throw 'Expected label in field: '+JSON.stringify(field);
+	}
 
 	me._bind(field.label, function(value) {
 		button.text = value
@@ -1130,18 +1140,21 @@ ViewRenderer.prototype._createImage = function(field) {
 
 
 
-	console.log('Set image: ' + src);
+	
 	var image = new imageModule.Image();
-	image.src = encodeURI(src);
+	image.loadMode="async";
+	//image.src = encodeURI(src);
 
-	src=me._getCachedImage(src, image);
+	me._setCachedImageAsync(src, image);
 
 	return image;
 
 }
-ViewRenderer.prototype._getCachedImage = function(url, image) {
+ViewRenderer.prototype._setCachedImageAsync = function(url, image) {
 	var me=this;
 
+	console.log('Set View Image Async: ' + url);
+	var startTime = (new Date()).valueOf()
 	if(url.indexOf(global.client.getProtocol() + '://') === 0){
 
 		var config=me._config();
@@ -1150,7 +1163,7 @@ ViewRenderer.prototype._getCachedImage = function(url, image) {
 		config.getImage(url, url).then(function(path){
 
 			image.src=path;
-
+			console.log('Image Async: '+((new Date()).valueOf()-startTime)+"ms "+path);
 
 		}).catch(function(err){
 			console.log('Error caching url: '+JSON.stringify(err)+' '+url);
@@ -2152,7 +2165,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 
 	if (field.type == 'optionlist') {
-		return renderOptionList(container, field, model);
+		return renderOptionList(container, field);
 	}
 	if (field.type == 'boolean') {
 		return renderBoolean(container, field, model);
@@ -2165,11 +2178,16 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 
 	if (field.type == 'space') {
-		return renderSpace(container, field, model);
+		return renderSpace(container, field);
 	}
 
 	if (field.type == 'location') {
-		return me.renderLocation(container, field, model);
+		return me.renderLocation(container, field);
+
+	}
+
+	if (field.type == 'orientation') {
+		return me.renderOrientation(container, field);
 
 	}
 
