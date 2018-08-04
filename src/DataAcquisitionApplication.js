@@ -6,7 +6,6 @@ var dialogs;
 
 
 var options;
-var template;
 var bghttp;
 
 var instance; //Deprecated! 
@@ -16,7 +15,7 @@ var _isArray = function(thing) {
     return Object.prototype.toString.call(thing) === "[object Array]";
 }
 
-function DataAcquisitionApplication(client, params) {
+function DataAcquisitionApplication(params) {
 
     var me = this;
     me._online = false;
@@ -26,26 +25,23 @@ function DataAcquisitionApplication(client, params) {
     fs = require("file-system");
     frameModule = require("ui/frame");
     dialogs = require("ui/dialogs");
-    var Template = require('../').Template;
-    template = Template.SharedInstance();
 
 
     bghttp = require("nativescript-background-http");
 
 
-    me.client = client;
     options = params;
     me.options = params;
 
     instance = me;
 
-    client.on('wentOnline',function(){
+    me._client().on('wentOnline',function(){
         console.log('got went online');
         me._setOnline();
 
     });
 
-    client.on('wentOffline',function(){
+    me._client().on('wentOffline',function(){
         console.log('got went offline');
         me._setOffline();
     });
@@ -77,7 +73,64 @@ DataAcquisitionApplication.SharedInstance = function() {
 DataAcquisitionApplication.prototype._config = function() {
     return require('../').Configuration.SharedInstance();
 }
+DataAcquisitionApplication.prototype._renderer = function() {
+    return require('../').ViewRenderer.SharedInstance();
+}
+DataAcquisitionApplication.prototype._client = function() {
+    return require('../').CoreClient.SharedInstance();
+}
 
+DataAcquisitionApplication.prototype.handleServerMessage=function(message, popover){
+
+    var me=this;
+
+    if(message.data){
+        console.log('Extend data: '+JSON.stringify(message.data));
+        me._renderer().extendCurrentData(message.data);
+    }
+
+    if(message.parameters){
+        console.log('Extend parameters: '+JSON.stringify(message.parameters));
+        me._config().extendDefaultParameters(message.parameters);
+    }
+
+    if(message.logout){
+        console.log('Forced relogin');
+        me._client().relogin();
+    }
+
+
+    if(message.text||message.title){
+
+
+            
+            if(popover){
+                if(message.type&&message.type!=="success"){
+                    if(message.type=="error"){
+                         return popover.showError(message.title||" ", message.text||" ", message.button||"Close");
+                    }
+                         
+                    return popover.showWarning(message.title||" ", message.text||" ", message.button||"Close");
+                    
+                }
+                
+                return popover.showSuccess(message.title||" ", message.text||" ", message.button||"Close");
+                
+               
+            }
+
+            return me.getMessageManager().alert({
+                "title":message.title||" ",
+                "message":message.text||" "
+            });
+
+            
+        }
+
+        
+
+
+}
 
 DataAcquisitionApplication.prototype.requireAccessToCamera = function() {
 
@@ -652,7 +705,7 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
     }
 
 
-    var url = global.client.getProtocol() + '://' + global.client.getUrl() + "/" + global.client.getPathForTask(type) + "&json=%7B%7D";
+    var url = me._client().getProtocol() + '://' + me._client().getUrl() + "/" + me._client().getPathForTask(type) + "&json=%7B%7D";
     var method = "POST";
 
     console.log('Initiating Background Upload: ' + filename);

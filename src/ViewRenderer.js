@@ -36,6 +36,10 @@ var activityIndicatorModule;
 
 function ViewRenderer() {
 
+	if(instance){
+		throw 'Singleton shared class should be accessed by calling ViewRenderer.SharedInstance()';
+	}
+
 	var me = this;
 
 	labelModule = require("ui/label");
@@ -62,7 +66,11 @@ function ViewRenderer() {
 	utilityModule = require("utils/utils");
 	SocialShare = require("nativescript-social-share");
 
-	PullToRefresh = require("nativescript-pulltorefresh").PullToRefresh
+	try{
+		PullToRefresh = require("nativescript-pulltorefresh").PullToRefresh
+	}catch(e){
+		console.log('Unable to use PullToRefresh')
+	}
 
 	if (instance) {
 		throw 'Singleton class instance has already been created! use ViewRenderer.SharedInstance()';
@@ -77,7 +85,8 @@ function ViewRenderer() {
 ViewRenderer.SharedInstance = function() {
 
 	if (!instance) {
-		throw 'Singleton class requires instantiation';
+		
+		instance=new ViewRenderer();
 	}
 	return instance
 
@@ -175,7 +184,7 @@ ViewRenderer.prototype._params = function(model) {
 	var me = this;
 
 	var params = JSON.parse(JSON.stringify(me._config().getDefaultParameters()));
-	params.data = JSON.parse(JSON.stringify(me.getCurrentViewData(model)));
+	params.data = JSON.parse(JSON.stringify(me.getActiveViewData(model)));
 	return params;
 
 }
@@ -185,6 +194,12 @@ ViewRenderer.prototype._params = function(model) {
 ViewRenderer.prototype._bind = function(str, callback) {
 
 	var me = this;
+
+	if(!me._shouldParse(str)){
+		callback(str);
+		return;
+	}
+
 	callback(me._parse(str));
 	if (me._shouldBindToData(str)) {
 		me._bindToDataChangeEvents(str, callback);
@@ -198,9 +213,12 @@ ViewRenderer.prototype._hasFormDataTemplate = function(str) {
 	return str.indexOf('{data.') >= 0;
 }
 
+ViewRenderer.prototype._shouldParse = function(str) {
+	return str.indexOf('{') >= 0&&str.indexOf('}') >= 0;
+}
 ViewRenderer.prototype._shouldBindToData = function(str) {
 	var me = this;
-	if (me._hasFormDataTemplate(str) || me._getParser().hasTemporalFormatter(str)) {
+	if (me._shouldParse(str)&&(me._hasFormDataTemplate(str) || me._getParser().hasTemporalFormatter(str))) {
 		return true;
 	}
 }
@@ -742,7 +760,7 @@ ViewRenderer.prototype.back = function(num) {
 	var me = this;
 
 	var topmost = frameModule.topmost();
-	me._setFormData(me.getCurrentViewData());
+	me._setFormData(me.getActiveViewData());
 	me._popSubform();
 
 
@@ -766,12 +784,12 @@ ViewRenderer.prototype.submit = function(field) {
 		num=num.back;
 	}
 
-	me._setFormData(me.getCurrentViewData());
+	me._setFormData(me.getActiveViewData());
 
 	var n = num || 0;
 	while (n > 0) {
 		me._popSubform();
-		me._setFormData(me.getCurrentViewData());
+		me._setFormData(me.getActiveViewData());
 		n--;
 	}
 
@@ -784,7 +802,9 @@ ViewRenderer.prototype.submit = function(field) {
 
 	me._submitHandler(extend(fieldData, me.getFormData()), field.name||me.currentView(), function(data) {
 
-		submittableFormData={};
+	
+
+		me._clearSubforms();
 
 		console.log('set form data after submit');
 		Object.keys(data).forEach(function(k) {
@@ -793,12 +813,21 @@ ViewRenderer.prototype.submit = function(field) {
 	});
 }
 
+ViewRenderer.prototype._clearSubforms = function() {
+	var me=this;
+		me._lazyFilledFormDataMap={};
+		me._models = [];
+		me._viewNames = [];
+		me._namedViewStack=[];
+		me.subFormsCallbacks = {};
+}
+
 ViewRenderer.prototype.cancel = function() {
 
 	var me = this;
 
 	var topmost = frameModule.topmost();
-	//global.setFormData(me.getCurrentViewData());
+	//global.setFormData(me.getActiveViewData());
 	me._popSubform();
 	console.log('Cancel');
 
@@ -1114,6 +1143,7 @@ ViewRenderer.prototype._createImage = function(field) {
 	}
 
 	if (me._isLocalFileAsset(url)) {
+		console.log('Local File Asset: '+url);
 		return me._imageFromLocalFileAsset(url);
 	}
 
@@ -1174,6 +1204,8 @@ ViewRenderer.prototype._setCachedImageAsync = function(url, image) {
 		}
 
 
+	}else{
+		image.src=url;
 	}
 	return url;
 }
@@ -1347,7 +1379,7 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 
 			.then(function(imgPath) {
 
-				console.log('Got Buttonset Image path: '+imgPath);
+				//console.log('Got Buttonset Image path: '+imgPath);
 
 				var image = new imageModule.Image();
 				image.src = imgPath;
@@ -1459,7 +1491,7 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 
 		console.log("Button With Function!");
 
-		action(me.getCurrentViewData(), button);
+		action(me.getActiveViewData(), button);
 
 
 		return;
@@ -1515,23 +1547,8 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 
 	if (action == 'form' || action == 'view' || action == 'list') {
 
-		var topmost = frameModule.topmost();
-
-		var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
-		if (field.name) {
-			contextOptions.form = contextOptions.form || field.name;
-		}
-		if (contextOptions.data ) {
-			//if(typeof contextOptions.data == 'string'){
-				contextOptions.data = me._parse(contextOptions.data);
-			//}
-		}
-
-		topmost.navigate({
-			moduleName: "views/form/form",
-			context: contextOptions
-
-		});
+		//me._navigateToForm(field);
+		me._showSubform(field);
 
 		return
 	}
@@ -1552,7 +1569,143 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 
 
 };
-//TODO REPLACE CONTENTS OF THIS METHOD WITH CALL TO addTapActionListener ^^^
+
+
+
+
+ViewRenderer.prototype._showSubform = function(field, callback) {
+
+	if(!(field.form||field.name||field.view)){
+		
+
+		throw 'form type: required to have at least `form`, `view`, or `name` field';
+
+
+	}
+
+	if(!field.name){
+		field.name=(field.form||field.view);
+	}
+	if(!(field.form||field.view)){
+		field.form=field.name;
+	}
+
+	var me = this;
+	var model=me._model;
+	
+		var chain = callback;
+		callback = function(data) {
+
+			data=data[field.name];
+			
+			model.set(field.name, data);
+			if (field.persist === true) {
+
+				if(field.value){
+					data=intersectDefault(data, field.value);
+				}
+
+				getConfiguration().setLocalData(field.name, data).then(function() {
+					console.log('wrote local: ' + field.name+" "+JSON.stringify(data));
+					if(chain){
+						chain(data);
+					}
+				}).catch(function(e) {
+					console.log('Failed to store local dataset: ' + field.name + ': ' + e);
+				});
+				return;
+			}
+				
+			if(chain){
+				chain(data);
+			}
+	
+
+
+		};
+
+
+	
+
+	//Need Context options for navigation before _pushSubform
+	//becuase, _pushSubform clears the model!
+	var contextOptions = me._contextOptionsFromField(field);
+	if(_isObject(model[field.name])){
+		contextOptions.data=extend(contextOptions.data||{}, JSON.parse(JSON.stringify(model[field.name])));
+	}
+	me._pushSubform(field.name, callback);
+
+
+	if (field.persist === true) {
+
+
+
+		getConfiguration().getLocalData(field.name, {}).then(function(data) {
+
+			contextOptions.data=extend(contextOptions.data||{}, data);
+			me._navigateToForm(contextOptions);
+
+		}).catch(function(e) {
+			console.log('failed to get local data: ' + e);
+			console.error(e);
+		})
+
+		return;
+
+	}
+
+	me._navigateToForm(contextOptions);
+}
+
+var intersectDefault=function(a, b){
+	var obj={};
+	Object.keys(b).forEach(function(k){
+		if(typeof a[k]!='undefined'){
+			obj[k]=a[k];
+		}else{
+			obj[k]=b[k]
+		}
+	})
+	return obj
+}
+
+ViewRenderer.prototype._navigateToForm=function(contextOptions){
+
+	var me=this;
+
+	var topmost = frameModule.topmost();
+
+	
+
+	topmost.navigate({
+		moduleName: "views/form/form",
+		context: contextOptions
+	});
+
+	return;
+}
+
+ViewRenderer.prototype._contextOptionsFromField=function(field){
+
+	var me=this;
+
+	var contextOptions = extend({}, field); 
+
+
+
+		/**
+		 * Note: I'm carefully allowing field to pass through withough making sure it is completely disconnected from 
+		 * any object references (using json) so that functions are not lost. (audio picker...)
+		 */
+		
+		if (contextOptions.data ) {
+			contextOptions.data = me._parse(contextOptions.data);
+		}
+
+		return contextOptions
+}
+
+
 ViewRenderer.prototype.addTapSelectedListener = function(button, field, buttons) {
 
 	var me = this;
@@ -1663,17 +1816,30 @@ var renderProgressBar = function(container, field, model) {
 
 }
 
+
+
+/**
+ * pushes the named form/view (model) onto a stack along with 
+ * a view name. before navigation. 
+ */
 ViewRenderer.prototype._pushSubform = function(name, callback) {
 
 	var me = this;
 	if (!me._models) {
 		me._models = [];
 		me._viewNames = [];
+		me._namedViewStack=[];
+		me.subFormsCallbacks = {};
 	}
 	me._models.push(me._model);
-	me._viewNames.push(me._viewName);
 
-	me._pushSubformData(name, callback);
+
+
+	me._model=null;
+	
+	me._viewNames.push(me._viewName);
+	me._namedViewStack.push(name);
+	me._addSubformPopCallback(name, callback);
 
 
 	var eventData = {
@@ -1682,9 +1848,20 @@ ViewRenderer.prototype._pushSubform = function(name, callback) {
 	};
 	me.notify(eventData);
 };
+
+ViewRenderer.prototype._addSubformPopCallback = function(name, callback) {
+    
+    var me=this;
+   
+    if (callback) {
+        me.subFormsCallbacks[name] = callback;
+    }
+}
+
 ViewRenderer.prototype._popSubform = function(name, callback) {
 	var me = this;
 	if (!me._models) {
+		throw 'Should have been set by pushSubform';
 		me._models = [];
 		me._viewNames = [];
 	}
@@ -1692,7 +1869,7 @@ ViewRenderer.prototype._popSubform = function(name, callback) {
 	me._clearUpdateIntervals();
 	me._model = me._models.pop();
 	me._viewName=me._viewNames.pop();
-	me._popSubformData();
+	me._triggerSubformPopCallback(me._namedViewStack.pop());
 
 
 	var eventData = {
@@ -1702,6 +1879,20 @@ ViewRenderer.prototype._popSubform = function(name, callback) {
 	me.notify(eventData);
 
 };
+
+ViewRenderer.prototype._triggerSubformPopCallback = function(name) {
+
+	var me=this;
+
+    console.log('Pop Subform: ' + name);
+    if (me.subFormsCallbacks[name]) {
+        me.subFormsCallbacks[name](global.getFormData());
+        delete me.subFormsCallbacks[name];
+    }
+
+
+}
+
 
 
 
@@ -1724,7 +1915,12 @@ ViewRenderer.prototype.renderForm = function(container, field) {
 
 		getConfiguration().getLocalData(field.name, field.value || {}).then(function(data) {
 
-			model.set(field.name, data);
+			if(field.value){
+				
+				model.set(field.name, intersectDefault(data, field.value));
+			}else{
+				model.set(field.name, data);
+			}
 
 		}).catch(function(e) {
 			console.log('failed to get local data: ' + e);
@@ -1740,81 +1936,6 @@ ViewRenderer.prototype.renderForm = function(container, field) {
 
 }
 
-ViewRenderer.prototype._showSubform = function(field, callback) {
-
-	var me = this;
-
-	if (field.persist === true) {
-		var chain = callback;
-		callback = function(data) {
-			console.log('Returned From Subform: ' + JSON.stringify(data))
-			getConfiguration().setLocalData(field.name, data).then(function() {
-				console.log('wrote local: ' + field.name);
-				chain(data);
-			}).catch(function(e) {
-				console.log('Failed to store local dataset: ' + field.name + ': ' + e);
-			});
-
-
-		};
-
-
-	}
-
-	me._pushSubform(field.name, callback);
-
-
-	/**
-	 * Note: I'm carefully allowing field to pass through withough making sure it is completely disconnected from 
-	 * any object references (using json) so that functions are not lost. (audio picker...)
-	 */
-	
-
-	var contextOptions = extend({}, field); //JSON.parse(JSON.stringify(field));
-
-	if(contextOptions.data){
-		contextOptions.data=me._parse(contextOptions.data);
-	}
-
-	if (field.name) {
-		contextOptions.form = contextOptions.form || field.name;
-
-	}
-
-	if (field.persist === true) {
-
-
-
-		getConfiguration().getLocalData(field.name, {}).then(function(data) {
-			me._setFormData(me.getCurrentViewData());
-
-
-
-			var topmost = frameModule.topmost();
-			topmost.navigate({
-				moduleName: "views/form/form",
-				//clearHistory: true,
-				backstackVisible: false,
-				context: contextOptions
-			});
-
-
-		}).catch(function(e) {
-			console.log('failed to get local data: ' + e);
-		})
-
-		return;
-
-	}
-
-	var topmost = frameModule.topmost();
-	topmost.navigate({
-		moduleName: "views/form/form",
-		//clearHistory: true,
-		backstackVisible: false,
-		context: contextOptions
-	});
-}
 
 
 
@@ -1882,17 +2003,7 @@ ViewRenderer.prototype.renderLayout = function(container, field) {
 
 	var me = this;
 
-	// <FlexboxLayout flexDirection="row" class="bottom-bar" id="bottom" flexShrink="0">
-	// 		<StackLayout id="bottom-left" orientation="horizontal">
-	// 	    </StackLayout>
-	// 	    <StackLayout id="bottom-center" flexGrow="1" orientation="horizontal">
-	// 	    </StackLayout>
-	// 	    <StackLayout id="bottom-right" orientation="horizontal">
-	// 	    </StackLayout>
-	// 	</FlexboxLayout>
-	// 	
-	// 	
-	// 	
+	
 
 	var FlexboxLayout = require("ui/layouts/flexbox-layout").FlexboxLayout;
 	var flexbox = new FlexboxLayout();
@@ -2102,7 +2213,9 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 		}
 	}
 
-
+	if(typeof field=="string"&&field[0]=="{"){
+		field=me._parse(field);
+	}
 
 	if (!field.type) {
 		throw 'Field must have a type! ' + JSON.stringify(field, null, "   ")
@@ -2296,43 +2409,20 @@ ViewRenderer.prototype.hasView = function(formName) {
 }
 
 
-/**
- * returns data associated with the currently visible view
- */
-ViewRenderer.prototype.getCurrentViewData = function(model) {
-	var me = this;
-
-	var data = {};
-	if (!model) {
-		model = me._model;
-	}
-	Object.keys(model).forEach(function(k) {
-		if (k.indexOf('_') === 0) {
-			return;
-		}
-		data[k] = model[k];
-	});
 
 
-	//console.log("Current Form Data: " + JSON.stringify(data, null, "   "));
-	return JSON.parse(JSON.stringify(data));
-}
 
-ViewRenderer.prototype.setCurrentViewData = function(data) {
+ViewRenderer.prototype.renderView = function(page, fields) {
 
 	var me = this;
 
-	console.log('Set Model Data From Form Data: ' + JSON.stringify(data) + " For Current View: " + me.currentView());
-	Object.keys(data).forEach(function(k) {
-		console.log('set ' + k + '=' + data[k]);
-		me._model.set(k, data[k]);
-	});
-}
+	var Observable = require("data/observable").Observable;
+ 	var model= new Observable();
+ 	model.on(Observable.propertyChangeEvent, function (PropertyChangeData) {
+        console.log(me.getNamedViewStackPath()+'.'+PropertyChangeData.propertyName+' changed: '+ JSON.stringify(PropertyChangeData.value));
+    });
 
-ViewRenderer.prototype.renderView = function(page, model, fields) {
-
-	var me = this;
-	me._model = model;
+ 	me._model=model;
 	me._page = page;
 
 
@@ -2352,17 +2442,17 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 		//console.log('Navigated From' + JSON.stringify(Object.keys(arg.object)));
 
 		if (arg.isBackNavigation) {
+			console.log('Should Pop Subform?');
+			if(arg.context&&(arg.context.name||arg.context.form)==me.currentView()){
+				console.log('Yessss');
+				me._setFormData(me.getActiveViewData());
+				me._popSubform();
+			}else{
+				console.log('Nooooo');
+			}
 			me._clearUpdateIntervals();
 		}
 	})
-
-
-
-	model.on(require("data/observable").Observable.propertyChangeEvent, function(data) {
-		console.log('Model Data Event: `' + data.propertyName + '`: ' + JSON.stringify(data.value));
-		// console.log('Property Changed '+JSON.stringify(data));
-		// console.log('Properties '+JSON.stringify(page.bindingContext));
-	});
 
 
 	page.bindingContext = model;
@@ -2409,12 +2499,17 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 		elements = context.fields
 	} else {
 
-		elements = me._getViewElements(['views', 'forms', 'lists', 'default-views'], formName);
+		elements = me._getBestFieldSetDefinition(['views', 'forms', 'lists', 'default-views'], formName);
 	}
 
 
 	if (typeof elements == 'string' && elements[0] == "{") {
-		elements = me._parse(elements);
+		try{
+			elements = me._parse(elements);
+		}catch(e){
+			console.error(e);
+			console.error('Failed to parse view elements from: '+elements);
+		}
 	}
 
 	if (!elements) {
@@ -2426,7 +2521,7 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 	var data = me.getFormData();
 	me.setCurrentViewData(data);
-	//me.getCurrentViewData();
+	//me.getActiveViewData();
 
 
 	var eventData = {
@@ -2438,7 +2533,7 @@ ViewRenderer.prototype.renderView = function(page, model, fields) {
 
 }
 
-ViewRenderer.prototype._getViewElements = function(name, view) {
+ViewRenderer.prototype._getBestFieldSetDefinition = function(name, view) {
 
 	var me = this;
 	var names = name;
@@ -2459,7 +2554,7 @@ ViewRenderer.prototype._getViewElements = function(name, view) {
 	}
 
 	if (names.length) {
-		return me._getViewElements(names, view);
+		return me._getBestFieldSetDefinition(names, view);
 	}
 
 	return false
@@ -2526,15 +2621,76 @@ var _createStack = function(items) {
 	return instance._createStack(items);
 }
 
+/**
+ * returns data associated with the currently visible view
+ * and any data added from any subviews (if popped or containing persistent data)
+ * (each view/subview has it's own model)
+ */
+ViewRenderer.prototype.getActiveViewData = function(model) {
+	var me = this;
+
+	var data = {};
+	if (!model) {
+		model = me._model;
+	}
+	Object.keys(model).forEach(function(k) {
+		if (k.indexOf('_') === 0) {
+			return;
+		}
+		data[k] = model[k];
+	});
+
+	return JSON.parse(JSON.stringify(data));
+}
+
+ViewRenderer.prototype.setCurrentViewData = function(data) {
+
+	var me = this;
+	me.mergeCurrentViewData(data);
+}
+
+ViewRenderer.prototype.mergeCurrentViewData = function(data) {
+
+	var me = this;
+
+	console.log('Set Model Data From Form Data: ' + JSON.stringify(data) + " For Current View: " + me.currentView());
+	Object.keys(data).forEach(function(k) {
+		console.log('set ' + k + '=' + data[k]);
+		me._model.set(k, data[k]);
+	});
+}
 
 
+/**
+ * Each view has a model that collects data but that data is only applied to the 
+ * _lazyFilledFormDataMap when:
+ * a view with a submit button and it is pressed, 
+ * or a subview's submit button is pressed (with back navagation)
+ * or if a subview is popped (back navigation).
+ */
 
 
-var submittableFormData = {};
+ViewRenderer.prototype.getLazyFilledFormDataStack = function() {
+	return  JSON.parse(JSON.stringify(me._lazyFilledFormDataMap));
+}
+ViewRenderer.prototype.getNamedViewStackPath = function() {
+	var me=this;
+	return  JSON.stringify(me._namedViewStack)
+}
 ViewRenderer.prototype.getFormData = function() {
-    var form = submittableFormData;
+	var me=this;
 
-    subFormsNames.forEach(function(s) {
+	if(!me._namedViewStack){
+		me._namedViewStack=[];
+	}
+
+	if(!me._lazyFilledFormDataMap){
+		me._lazyFilledFormDataMap={};
+	}
+
+    var form = me._lazyFilledFormDataMap;
+
+    me._namedViewStack.forEach(function(s) {
         if (!form[s]) {
             form[s] = {};
 
@@ -2550,52 +2706,13 @@ ViewRenderer.prototype.getFormData = function() {
     });
     return JSON.parse(JSON.stringify(data)); //remove any references
 }
-global.getFormData=function(){
-	return instance.getFormData()
-}
-
-
-
-var subFormsNames = [];
-var subFormsCallbacks = {};
-var getSubformName = function() {
-
-    if (subFormsNames.length === 0) {
-        return 'root';
-    }
-
-    var name = subFormsNames[subFormsNames.length - 1];
-    return name;
-}
-ViewRenderer.prototype._popSubformData = function() {
-
-
-
-    var name = subFormsNames[subFormsNames.length - 1];
-    console.log('Pop Subform: ' + name);
-    if (subFormsCallbacks[name]) {
-        subFormsCallbacks[name](global.getFormData());
-        delete subFormsCallbacks[name];
-    }
-
-    subFormsNames.pop();
-
-}
-ViewRenderer.prototype._pushSubformData = function(name, callback) {
-    console.log('Push Subform: ' + name)
-    subFormsNames.push(name);
-
-    if (callback) {
-        subFormsCallbacks[name] = callback;
-    }
-}
-
-
 
 ViewRenderer.prototype._setFormData = function(data) {
-    var form = submittableFormData;
 
-    subFormsNames.forEach(function(s) {
+	var me=this;
+    var form = me._lazyFilledFormDataMap;
+
+    me._namedViewStack.forEach(function(s) {
         if (!form[s]) {
             form[s] = {};
 
@@ -2608,9 +2725,33 @@ ViewRenderer.prototype._setFormData = function(data) {
     Object.keys(data).forEach(function(k) {
         form[k] = data[k];
     });
-    console.log('Set Form Data for: ' + getSubformName() + ': ' + JSON.stringify(form));
+    console.log('Set Form Data for: ' + me._getSubformName() + ': ' + JSON.stringify(form));
 
 }
+global.getFormData=function(){
+	return instance.getFormData()
+}
+
+
+
+
+
+
+
+ViewRenderer.prototype._getSubformName = function() {
+	var me=this;
+
+    if (me._namedViewStack.length === 0) {
+        return 'root';
+    }
+
+    var name = me._namedViewStack[me._namedViewStack.length - 1];
+    return name;
+}
+
+
+
+
 
 
 module.exports = ViewRenderer;

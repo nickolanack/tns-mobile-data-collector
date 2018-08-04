@@ -2,7 +2,7 @@
   "name": "tns-mobile-data-collector",
   "version": "1.0.0",
   "description": "mobile app library for spatial datacollection apps that connect to a geolive server ",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -1,9 +1,15 @@
 //var events = require("events");
 
-
+var instance=null;
 
 function CoreAppClient(config) {
 	var me = this;
+
+	if(instance){
+		throw 'Already instantiated singleton class should be accessed by calling CoreAppClient.SharedInstance()';
+	}
+	instance=me;
+
 	me.config = config;
 };
 
@@ -20,6 +26,15 @@ try {
 	console.error('Unable to extend Observable!!!');
 }
 
+
+CoreAppClient.SharedInstance = function() {
+
+	if (!instance) {
+		throw ''
+	}
+	return instance
+
+}
 
 CoreAppClient.NativeScriptClient=function(domain){
 
@@ -400,7 +415,10 @@ CoreAppClient.prototype.setReconnectFunction = function(fn) {
 	var me=this;
 	me._reconnectFunction=fn;
 }
-
+CoreAppClient.prototype.canRelogin=function(){
+	var me=this;
+	return !!me._reconnectFunction;
+}
 CoreAppClient.prototype.relogin=function(){
 	var me=this;
 	if(!me._reconnectFunction){

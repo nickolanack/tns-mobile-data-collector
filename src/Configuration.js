@@ -521,7 +521,6 @@ Configuration.prototype._getLocalImageSrc = function(name) {
 
 	var me=this;
 	var path = me.imagePath(name);
-	console.log('Using Cached Image: ' + path);
 	return new Promise(function(resolve, reject) {
 		setTimeout(function(){ resolve(path); }, 1);
 	});
@@ -538,15 +537,9 @@ Configuration.prototype._getImageSrc = function(name, url) {
 			url = me.client.getProtocol() + "://" + me.client.getUrl() + '/' + url;
 		}
 
-		//TODO deprecated use http.getImage(url: string)
-
-		console.log('Fetch Image: ' + url);
 		require('http').getImage(encodeURI(url)).then(function(imgSource) {
 
-			//console.log('Retrieved image: '+JSON.stringify(imgSource));
 			resolve(me.saveImage(name, imgSource));
-
-
 
 		}).catch(function(error) {
 

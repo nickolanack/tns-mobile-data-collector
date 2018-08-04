@@ -379,7 +379,7 @@ Template.prototype._addSystemVariables = function(data) {
 
 	try{
 		var orientation = require('nativescript-orientation');
-  		console.log(orientation.getOrientation());
+  		//console.log(orientation.getOrientation());
   		data.orientation=orientation.getOrientation();
 
   	}catch(e){

@@ -13,6 +13,11 @@ function Account(config) {
 	singletonAccountInstance = me;
 
 
+	var application = require("application");
+	if(application.ios&&global.parameters.domain=="bcwf.geolive.ca"){
+		me._checkMigrationFromSqlite("default.db");
+	}
+
 };
 
 
@@ -35,6 +40,107 @@ Account.SharedInstance=function(){
     }
     return singletonAccountInstance;
 }
+
+
+var _migrationPathToDb = function(fileName) {
+	var fs = require("file-system");
+	
+
+	
+
+	var folder=fs.knownFolders.documents();
+	//var folder=fs.knownFolders.currentApp(); //contains test file: default.db
+	var path=folder.path;
+	var file = fs.path.join(path, fileName);
+
+	
+
+	if(fs.File.exists(file)){
+		return file;
+	}
+
+	return false;
+}
+
+
+Account.prototype._migrationImportAccount = function(db) {
+
+	var me=this;
+
+	var query='SELECT * from users;';
+	console.log(query);
+	db.get(query, function(err, row) {
+		if(err){
+			console.log('Query Error;');
+			console.error(err);
+			return;
+		}
+
+		var device={
+			"subscription":false,
+			"success":true,
+			"id":row.deviceid,
+			"msg":"successfully registered your device with the server.",
+			"provisioningKey":""
+		};
+
+		var account={
+			"subscription":false,
+			"success":true,
+			"username":row.uname,
+			"password":row.password,
+			"id":row.geolid,
+			"create":true
+		}
+
+		me._getConfiguration().setLocalData('device', device);
+		me._getConfiguration().setLocalData('account', account);
+
+  		console.log("Row of data was: "+JSON.stringify(row, null, '  '));  // Prints [["Field1", "Field2",...]]
+	});
+}
+
+
+Account.prototype._checkMigrationFromSqlite = function(fileName) {
+
+	var me=this;
+
+	console.log('CHECKING MIGRATION');
+	
+
+	var file=_migrationPathToDb(fileName);
+	
+	if(file){
+
+		
+
+
+
+		console.log('EXISTS '+file);
+		var Sqlite=require('nativescript-sqlite');
+		new Sqlite(file, function(err, db){
+
+
+			if(err){
+				console.log('Sqlite error;');
+				console.err(err);
+				return;
+			}
+			db.resultType(Sqlite.RESULTSASOBJECT);
+		
+			me._migrationImportAccount(db);
+			
+
+		});
+	}
+
+
+
+
+}
+
+
+
 
 
 Account.prototype.getCurrentDeviceName = function() {
@@ -68,7 +174,7 @@ Account.prototype._setOnline = function() {
 }
 
 Account.prototype._getClient = function() {
-	return global.client;
+	return require('../').CoreClient.SharedInstance();
 }
 
 Account.prototype._getConfiguration = function() {
