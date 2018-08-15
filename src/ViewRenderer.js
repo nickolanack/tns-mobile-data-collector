@@ -1971,8 +1971,13 @@ ViewRenderer.prototype._renderFields = function(container, fields) {
 	if (_isArray(fields)) {
 		//console.log('Create StackLayout Array "right" '+JSON.stringify(right));
 		var elements = [];
-		fields.forEach(function(field) {
-			elements.push(me.renderField(container, field));
+		fields.forEach(function(field , i) {
+			try{
+				elements.push(me.renderField(container, field));
+			}catch(e){
+				console.error(e);
+				throw 'Exception rendering fields['+i+']: '+JSON.stringify(fields);
+			}
 		});
 		return elements;
 
@@ -2517,7 +2522,12 @@ ViewRenderer.prototype.renderView = function(page, fields) {
 	}
 
 	me._renderDefaultStyle();
-	me._renderFields(container, elements);
+	try{
+		me._renderFields(container, elements);
+	}catch(e){
+		console.error(e);
+		throw 'Error rendering view: '+formName;
+	}
 
 	var data = me.getFormData();
 	me.setCurrentViewData(data);

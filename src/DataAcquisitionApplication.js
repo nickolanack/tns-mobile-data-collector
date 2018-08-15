@@ -32,6 +32,9 @@ function DataAcquisitionApplication(params) {
 
     options = params;
     me.options = params;
+    if(!me.options.paramters){
+        throw 'Requires parameters';
+    }
 
     instance = me;
 

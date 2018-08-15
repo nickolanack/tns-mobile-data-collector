@@ -80,7 +80,7 @@ CoreAppClient.NativeScriptClient=function(domain){
 		console.log('nativescript request');
 
         var form = Object.keys(data).map(function(k) {
-            return k + "=" + encodeURI(data[k]);
+            return k + "=" + encodeURIComponent(data[k]);
         }).join('&');
         var http = require('http');
 
