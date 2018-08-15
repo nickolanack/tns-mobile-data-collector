@@ -32,7 +32,7 @@ function DataAcquisitionApplication(params) {
 
     options = params;
     me.options = params;
-    if(!me.options.paramters){
+    if(!me.options.parameters){
         throw 'Requires parameters';
     }
 
