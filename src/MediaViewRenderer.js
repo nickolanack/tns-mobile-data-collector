@@ -410,7 +410,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 						me._renderer.back();
 						me._renderer._model.set("audio-picker", data);
 						console.log("audiorecorder data: " + JSON.stringify(data, null, "   "));
-						console.log("Main data: " + JSON.stringify(me._renderer.getCurrentViewData(), null, "   "));
+						//console.log("Main data: " + JSON.stringify(me._renderer.getCurrentViewData(), null, "   "));
 
 
 						imageAssets.push(data.filename);

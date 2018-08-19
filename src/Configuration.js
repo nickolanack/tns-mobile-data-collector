@@ -649,7 +649,7 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 				return response.text();
 			})
 			.then(function(text) {
-				console.log(text);
+				console.log("Downloaded Style: "+text.substring(0, 50)+' ...');
 				me.saveStyle(name, text);
 				resolve(me.stylePath(name));
 			})

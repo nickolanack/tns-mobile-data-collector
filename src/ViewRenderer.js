@@ -795,7 +795,7 @@ ViewRenderer.prototype.submit = function(field) {
 
 	var fieldData={};
 	if(field.data){
-		fieldData=JSON.parse(JSON.stringify(field.data));
+		fieldData=me._parse(JSON.parse(JSON.stringify(field.data)));
 	}
 
 
@@ -851,7 +851,7 @@ ViewRenderer.prototype.renderTextField = function(container, field) {
 	}
 	
 
-	instance._addClass(textfield, "textfield")
+	me._addClass(textfield, "textfield")
 	var bindingOptions = {
 		sourceProperty: field.name,
 		targetProperty: "text",
@@ -883,7 +883,7 @@ ViewRenderer.prototype.renderTextFieldArea = function(container, field) {
 		textfield.hint = field.placeholder;
 	}
 
-	instance._addClass(textfield, "textfield")
+	me._addClass(textfield, "textfield")
 	var bindingOptions = {
 		sourceProperty: field.name,
 		targetProperty: "text",
@@ -902,7 +902,7 @@ ViewRenderer.prototype.renderTextFieldArea = function(container, field) {
 
 }
 
-var renderOptionList = function(container, field) {
+ViewRenderer.prototype.renderOptionList = function(container, field) {
 
 	var picker = new listPickerModule.ListPicker();
 	picker.items = field.values;
@@ -912,10 +912,11 @@ var renderOptionList = function(container, field) {
 }
 
 
-var renderBoolean = function(container, field, model) {
+ViewRenderer.prototype.renderBoolean = function(container, field) {
 
+	var me=this;
 	var toggle = new switchModule.Switch();
-
+	var model=me._model;
 
 	toggle.text = "Button";
 
@@ -1745,8 +1746,9 @@ ViewRenderer.prototype.renderStyle = function(style) {
 	.then(function(stylePath) {
 
 
-		console.log(stylePath);
+		//a warning gets written becuase cache folder is not relative to app...
 		me._page.addCssFile(stylePath);
+		
 
 	})
 	.catch(function(err) {
@@ -1757,9 +1759,11 @@ ViewRenderer.prototype.renderStyle = function(style) {
 
 
 
-var renderProgressBar = function(container, field, model) {
+ViewRenderer.prototype.renderProgressBar = function(container, field) {
 
+	var me=this;
 
+	var model=me._model;
 
 	var progress = new progressModule.Progress();
 	progress.value = field.value || 0;
@@ -2283,10 +2287,10 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 
 	if (field.type == 'optionlist') {
-		return renderOptionList(container, field);
+		return me.renderOptionList(container, field);
 	}
 	if (field.type == 'boolean') {
-		return renderBoolean(container, field, model);
+		return me.renderBoolean(container, field);
 	}
 
 	if (field.type == 'iconselect') {
@@ -2310,27 +2314,27 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 
 	if (field.type == 'form') {
-		return me.renderForm(container, field, model);
+		return me.renderForm(container, field);
 
 	}
 
 	if (field.type == 'button') {
-		return me.renderButton(container, field, model);
+		return me.renderButton(container, field);
 
 	}
 
 	if (field.type == 'icon') {
-		return me.renderButtonsetButton(container, field, model);
+		return me.renderButtonsetButton(container, field);
 
 	}
 
 	if (field.type == 'buttonset') {
-		return me.renderButtonset(container, field, model);
+		return me.renderButtonset(container, field);
 
 	}
 
 	if (field.type == 'progressbar') {
-		return renderProgressBar(container, field, model);
+		return renderProgressBar(container, field);
 
 	}
 
