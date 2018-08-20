@@ -1342,12 +1342,12 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 	if (field.icon) {
 		var icon = field.icon;
 
+		if (typeof icon == 'string'&&icon.indexOf('{')==-1&&icon.indexOf('/')==-1){
+			throw 'No longer supporting param icons without `{}`: '+icon;
+		}
 
-		var uiimage=null;
-
-		//if (typeof icon == 'string' && (icon[0] == "{"||icon.indexOf('/')>=0)) {
-			uiimage = me._createImage(icon);
-		//}
+		var uiimage= me._createImage(icon);
+		
 
 		if (me._isImageAsset(icon)) {
 			console.log('Assume that field.icon is an imageAsset');
@@ -1375,7 +1375,7 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 
 
 
-
+		//TODO: remove unreachable code!
 
 		getConfiguration().getImage(icon)
 
