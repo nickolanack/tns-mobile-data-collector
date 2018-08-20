@@ -127,7 +127,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 						}]
 
 					}, {
-						"icon": "remove-media",
+						"icon": "{remove-media}",
 						"className": "remove-media",
 						"action": function() {
 							mediaSelection.removeChild(buttonset);
@@ -208,7 +208,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 						var buttonset = me._renderer.renderButtonset(mediaSelection, {
 							"buttons": [{
-								"icon": "video-icon",
+								"icon": "{video-icon}",
 								"className": "video-icon",
 								"action": "form",
 								"name": "video-viewer",
@@ -217,7 +217,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 									"video": data.file
 								}]
 							}, {
-								"icon": "remove-media",
+								"icon": "{remove-media}",
 								"className": "remove-media",
 								"action": function() {
 
@@ -419,7 +419,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 						var buttonset = me._renderer.renderButtonset(mediaSelection, {
 
 							"buttons": [{
-								"icon": "audio-icon",
+								"icon": "{audio-icon}",
 
 								"className": "preview-audio",
 								"action": function(d, el) {
@@ -457,7 +457,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 								}
 							}, {
-								"icon": "remove-media",
+								"icon": "{remove-media}",
 
 								"className": "remove-media",
 
@@ -586,7 +586,7 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 	var button = me._renderer.renderButtonset(container, {
 		"className": "btn-main",
 		"buttons": [{
-			"icon": "record-audio",
+			"icon": "{record-audio}",
 			"label": "{data.labelState}",
 			"className": "record-audio",
 			"action": function() {
@@ -651,7 +651,7 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 	me._renderer.renderButtonset(container, {
 
 		"buttons": [{
-			"icon": "preview-audio",
+			"icon": "{preview-audio}",
 			"label": "{data.playing|?`Playing`:`Listen`}",
 			"className": "preview-audio {data.hasAudio|?``:`transparent`}",
 			"enabled": "{data.hasAudio}",
@@ -687,7 +687,7 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 			}
 
 		}, {
-			"icon": "remove-media",
+			"icon": "{remove-media}",
 			"label": "Remove",
 			"className": "preview-audio {data.hasAudio|?``:`transparent`}",
 			"enabled": "{data.hasAudio}",
@@ -710,7 +710,7 @@ MediaViewRenderer.prototype.renderAudioPlayer = function(container, field) {
 	return me._renderer.renderButtonset(container, {
 
 		"buttons": [{
-			"icon": field.icon || "preview-audio",
+			"icon": field.icon || "{preview-audio}",
 			"className": "preview-audio {data.hasAudio|?``:`transparent`}",
 
 			"action": function(d, el) {
