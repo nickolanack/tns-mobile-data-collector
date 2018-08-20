@@ -1943,7 +1943,7 @@ ViewRenderer.prototype.renderForm = function(container, field) {
 
 
 
-ViewRenderer.prototype.renderScroll = function(container, fields, model) {
+ViewRenderer.prototype.renderScroll = function(container, fields) {
 	var me = this;
 
 	console.log(scrollViewModule.ScrollView);
@@ -2334,7 +2334,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 	}
 
 	if (field.type == 'progressbar') {
-		return renderProgressBar(container, field);
+		return me.renderProgressBar(container, field);
 
 	}
 
@@ -2343,7 +2343,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 
 	}
 	if (field.type == 'scroll') {
-		return me.renderScroll(container, field, model);
+		return me.renderScroll(container, field);
 
 	}
 	if (field.type == 'image') {
@@ -2517,7 +2517,7 @@ ViewRenderer.prototype.renderView = function(page, fields) {
 			elements = me._parse(elements);
 		}catch(e){
 			console.error(e);
-			console.error('Failed to parse view elements from: '+elements);
+			throw 'Failed to parse view elements from: '+elements;
 		}
 	}
 
@@ -2530,7 +2530,7 @@ ViewRenderer.prototype.renderView = function(page, fields) {
 		me._renderFields(container, elements);
 	}catch(e){
 		console.error(e);
-		throw 'Error rendering view: '+formName;
+		throw 'Error rendering view fields: '+formName+" "+JSON.stringify(elements);
 	}
 
 	var data = me.getFormData();
