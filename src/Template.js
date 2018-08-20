@@ -93,6 +93,8 @@ Template.prototype._format = function(variable, formatters) {
 
 	formatters.forEach(function(format) {
 
+
+
 		if (format.indexOf('?') === 0) {
 			var options = format.substring(1).split(':');
 			if (options.length > 2) {
@@ -589,6 +591,7 @@ Template.prototype._renderIntoString = function(str, data) {
 						remainingFormatStr='';
 					}
 					
+					
 				}
 
 
@@ -596,16 +599,17 @@ Template.prototype._renderIntoString = function(str, data) {
 				if (regResults[0] === str) {
 
 
-					if (!_isString(dataForKey)) {
+					if (_isString(dataForKey)||typeof dataForKey == "number") {
 						if (me._prepareTemplate) {
 
-							if (typeof dataForKey == "number") {
-								str = '{`' + dataForKey + '`'+remainingFormatStr+'}';
-							}
-
+							
+							str = '{`' + dataForKey + '`'+remainingFormatStr+'}';
+							
 							return str;
 						}
 					}
+
+					//console.log('return dataForKey');
 
 					return dataForKey;
 				}
@@ -614,6 +618,7 @@ Template.prototype._renderIntoString = function(str, data) {
 				//Is a substring, but easily replaceable
 
 				if (_isStringLike(dataForKey)) {
+
 
 					if (me._prepareTemplate) {
 						str = str.replace(regResults[0], '{`'+dataForKey+'`'+remainingFormatStr+'}');

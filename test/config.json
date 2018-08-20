@@ -1,5 +1,6 @@
         {
 	"parameters": {
+		"protocol":"http",
 		"domain": "somedomain.ca",
 		"provider": "core-app",
 		"layer": 1,
@@ -192,7 +193,7 @@
 		"dialog-submitformerror-title": "Failed to submit form",
 		"dialog-submitformerror-message": "Don't worry we'll keep trying",
 		"dialog-submitform-title": "Form Submited",
-		"app-style": "https://alpine.geolive.ca/app-style.content",
+		"app-style": "{protocol}://{domain}/app-style.content",
 		"survey": [],
 		"about": [],
 		"includes": [

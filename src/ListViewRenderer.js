@@ -206,7 +206,6 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 							
 							me._renderer._config().extendDefaultParameters({"item-value":listItem});
 							var preparsedFields=me._prepareTemplate(listItem, fields);
-							
 							me._renderer._renderFields(listItemStack, fields);
 
 						}catch(e){
