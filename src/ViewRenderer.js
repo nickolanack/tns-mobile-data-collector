@@ -1342,11 +1342,12 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 	if (field.icon) {
 		var icon = field.icon;
 
+
 		var uiimage=null;
 
-		if (typeof icon == 'string' && (icon[0] == "{"||icon.indexOf('/')>=0)) {
+		//if (typeof icon == 'string' && (icon[0] == "{"||icon.indexOf('/')>=0)) {
 			uiimage = me._createImage(icon);
-		}
+		//}
 
 		if (me._isImageAsset(icon)) {
 			console.log('Assume that field.icon is an imageAsset');
