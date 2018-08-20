@@ -1348,13 +1348,6 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 
 		var uiimage= me._createImage(icon);
 		
-
-		if (me._isImageAsset(icon)) {
-			console.log('Assume that field.icon is an imageAsset');
-			uiimage = me._imageFromImageAsset(icon);
-		}
-
-
 		if(uiimage){
 			stackLayout.addChild(uiimage);
 
