@@ -14,5 +14,6 @@ module.exports={
 	HtmlParser:require('./src/HtmlParser'),
 	Template:require('./src/Template.js'),
 	ARViewRenderer:require('./src/ARViewRenderer.js'),
+	ImageResolver:require('./src/ImageResolver.js'),
 
 };

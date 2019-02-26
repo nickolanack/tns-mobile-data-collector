@@ -27,7 +27,8 @@ var extend = function(a, b) {
 
 ARViewRenderer.prototype.renderARView = function(container, field) {
 
-
+	var Color=require('tns-core-modules/color').Color;
+	var ARNodeInteraction= require("nativescript-ar").ARNodeInteraction;
 
 	var arModule = require("nativescript-ar");
 	var AR=arModule.AR;
@@ -54,11 +55,28 @@ ARViewRenderer.prototype.renderARView = function(container, field) {
 
 	ar.on('arLoaded', function(){
 		console.log("Loaded");
+
+
+
+
+		var shape=com.google.ar.sceneform.rendering.ShapeFactory.makeSphere(
+			10,{
+			    x: 0,
+			    y: 0,
+			    z: 10
+			  }, com.google.ar.sceneform.rendering.MaterialFactory.makeOpaqueWithColor(AR._context, new Color("blue")));
+
+		console.log('Added Sphere');
 	})
 	ar.on('planeTapped', function(){
 		console.log("Tapped");
 	})
 	container.addChild(ar);
+
+
+	
+
+
 
 }
 

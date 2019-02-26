@@ -379,6 +379,11 @@ CoreAppClient.prototype._setOnline=function(){
 	me._online=true;
 }
 
+CoreAppClient.prototype.isOnline=function(){
+	var me=this;
+	return !!me._online;
+}
+
 CoreAppClient.prototype.isConnected = function() {
 	var me = this;
 

@@ -138,9 +138,14 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 	var stack=me._renderer._createStack();
 
 	if(field.pullsToRefresh){
-		var pulltorefresh =new (require('nativescript-pulltorefresh').PullToRefresh)();
-		container.addChild(pulltorefresh);
+		var pulltorefresh =new (require('nativescript-pulltorefresh').PullToRefresh)({
+			refreshList:function(){
+				console.log("refresh");
+			}
+		});
 		pulltorefresh.content=stack;
+		container.addChild(pulltorefresh);
+		
 	}else{
 		container.addChild(stack);
 	}
@@ -162,7 +167,7 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 			
 	});
 
-	me._resolveList(list).then(function(list){
+	var render=function(list){
 
 		try{
 			console.log('Resolved list');
@@ -256,9 +261,12 @@ ListViewRenderer.prototype.renderList = function(container, field) {
 			console.error(e);
 		}
 
-	}).catch(function(e){
+	};
+
+	me._resolveList(list).then(render).catch(function(e){
 		console.log('List Error: '+e);
 		console.error(e);
+		render([]);
 	});
 	
 

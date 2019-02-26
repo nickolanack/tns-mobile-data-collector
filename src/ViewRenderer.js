@@ -78,6 +78,34 @@ function ViewRenderer() {
 	instance = me;
 
 
+	me._client().on("wentOffline", function(){
+
+		if (me._models) {
+			me._models.forEach(function(m){
+				m.set("online", false);
+			});
+		}
+		if(me._model){
+			me._model.set("online", false);
+		}
+		
+
+	})
+	me._client().on("wentOnline",function(){
+
+		if (me._models) {
+			me._models.forEach(function(m){
+				m.set("online", true);
+			});
+		}
+		if(me._model){
+			me._model.set("online", true);
+		}
+
+	});
+
+
+
 };
 
 
@@ -103,6 +131,7 @@ try {
 	var observableModule = require("data/observable");
 	ViewRenderer.prototype = new observableModule.Observable();
 
+
 } catch (e) {
 	/**
 	 * TODO: extend Observable or Mock object in a way that supports unit tests
@@ -110,6 +139,13 @@ try {
 	console.error('Unable to extend Observable!!!');
 }
 
+
+
+
+ViewRenderer.prototype._initModel=function(m){
+	var me=this;
+	m.set('online', me._client().isOnline());
+}
 
 
 ViewRenderer.prototype.currentView = function() {
@@ -143,7 +179,11 @@ ViewRenderer.prototype._renderDefaultStyle=function(){
 
 
 ViewRenderer.prototype._app = function() {
-	return require('tns-mobile-data-collector').DataAcquisitionApplication.SharedInstance();
+	return require('../').DataAcquisitionApplication.SharedInstance();
+}
+
+ViewRenderer.prototype._client = function() {
+	return require('../').CoreClient.SharedInstance();
 }
 
 ViewRenderer.prototype._config = function() {
@@ -751,6 +791,10 @@ var extend = function(a, b) {
 		a[k] = b[k];
 	});
 
+	if(arguments.length>2){
+		return extend.apply(null, ([a]).concat(Array.prototype.slice.call(arguments, 2)));
+	}
+
 	return a;
 }
 
@@ -904,9 +948,25 @@ ViewRenderer.prototype.renderTextFieldArea = function(container, field) {
 
 ViewRenderer.prototype.renderOptionList = function(container, field) {
 
+	var me=this;
+	var model=me._model;
+
 	var picker = new listPickerModule.ListPicker();
 	picker.items = field.values;
-	picker.selectedIndex = field.value;
+
+	var bindingOptions = {
+		sourceProperty: field.name,
+		targetProperty: "selectedIndex",
+		twoWay: true
+	}
+
+	picker.bind(bindingOptions, model);
+	model.set(field.name, model.get(field.name)||0);
+
+	if(field.value){
+		picker.selectedIndex = (typeof field.value=="string")?field.values.indexOf(field.value):field.value;
+	}
+	
 	container.addChild(picker);
 
 }
@@ -929,7 +989,8 @@ ViewRenderer.prototype.renderBoolean = function(container, field) {
 	toggle.bind(bindingOptions, model);
 
 
-	model.set(field.name, !!field.value);
+
+	model.set(field.name, !!(model.get(field.name)||false));
 
 	var stackLayout = new stackLayoutModule.StackLayout();
 
@@ -939,10 +1000,12 @@ ViewRenderer.prototype.renderBoolean = function(container, field) {
 	stackLayout.orientation = "horizontal";
 	stackLayout.addChild(toggle);
 
-	renderLabel(stackLayout, {
-		value: field.label
-	});
-
+	if(field.label){
+		renderLabel(stackLayout, {
+			value: field.label
+		});
+	}
+	
 }
 
 
@@ -1030,23 +1093,14 @@ ViewRenderer.prototype.renderIconselect = function(container, field) {
 		imageStack.addChild(stackLayout);
 
 		
+		var image=me._createImage(icon.icon);
 
-		getConfiguration().getIcon(icon.icon)
+		stackLayout.addChild(image);
+		renderLabel(imageStack, {
+			value: icon.value
+		});
 
-			.then(function(imgPath) {
 
-				var image = new imageModule.Image();
-
-				image.src = imgPath;
-				stackLayout.addChild(image);
-				renderLabel(imageStack, {
-					value: icon.value
-				})
-
-			})
-			.catch(function(err) {
-				console.log("Render Image Error: " + err);
-			});
 
 
 		var selectIcon = function() {
@@ -1106,130 +1160,13 @@ var renderImage = function(container, field) {
 
 ViewRenderer.prototype._createImage = function(field) {
 
+
 	var me = this;
 
-	var url = field;
-	if (field.image) {
-		url = field.image;
-	}
-
-
-
-	if (typeof url == 'function') {
-		url = url();
-	}
-
-	if (_isArray(url) && url.length == 1 && typeof url[0] == "string") {
-		url = url[0];
-	}
-
-	if (me._isImageAsset(url)) {
-		return me._imageFromImageAsset(url);
-	}
-
-	if (typeof url == 'string' && url.indexOf('{') >= 0) {
-		var before=url;
-		url = me._parse(url);
-		console.log('Variable Image: ' +before+"=>"+ url);
-
-
-	}
-
-	if (_isArray(url) && url.length == 1 && typeof url[0] == "string") {
-		/**
-		 * support for using core-app imageset image which is always an array with image url at 0 (possibly multiple images...);
-		 * @type {[type]}
-		 */
-		url = url[0];
-	}
-
-	if (me._isLocalFileAsset(url)) {
-		console.log('Local File Asset: '+url);
-		return me._imageFromLocalFileAsset(url);
-	}
-
-
-	var src = url;
-
-	if (typeof src != "string") {
-		throw 'Expected image src to be a string ' + src + (typeof src);
-	}
-
-
-
-	if (src[0] !== "~"&&src.indexOf('http')!==0) {
-		src = global.client.getProtocol() + '://' + global.client.getUrl() + "/" + src;
-	}
-
-
-
-	
-	src = me._getImageThumb(src, field);
-
-	
-
-
-
-
-	
-	var image = new imageModule.Image();
-	image.loadMode="async";
-	//image.src = encodeURI(src);
-
-	me._setCachedImageAsync(src, image);
-
-	return image;
+	var ImageResolver = require('../').ImageResolver;
+	return (new ImageResolver()).setParser(me._parse.bind(me)).createImage(field);
 
 }
-ViewRenderer.prototype._setCachedImageAsync = function(url, image) {
-	var me=this;
-
-	console.log('Set View Image Async: ' + url);
-	var startTime = (new Date()).valueOf()
-	if(url.indexOf(global.client.getProtocol() + '://') === 0){
-
-		var config=me._config();
-		var hasImage=config.hasCachedImage(url);
-
-		config.getImage(url, url).then(function(path){
-
-			image.src=path;
-			console.log('Image Async: '+((new Date()).valueOf()-startTime)+"ms "+path);
-
-		}).catch(function(err){
-			console.log('Error caching url: '+JSON.stringify(err)+' '+url);
-		});
-
-		if(hasImage){
-			return config.cachedImagePath(url);
-		}
-
-
-	}else{
-		image.src=url;
-	}
-	return url;
-}
-
-
-ViewRenderer.prototype._getImageThumb = function(url, field) {
-
-
-	if(field.size && url.indexOf(global.client.getProtocol() + '://') === 0){
-
-
-		var size = field.size;
-		return url.split('?')[0] + '?thumb=' + size.w + 'x' + size.h;
-
-
-	}
-
-	return url;
-
-
-}
-
-
 
 ViewRenderer.prototype.renderButtonset = function(container, field) {
 
@@ -1274,55 +1211,6 @@ ViewRenderer.prototype._clearSelected = function(buttons) {
 }
 
 
-ViewRenderer.prototype._isImageAsset = function(asset) {
-
-	if (asset && (typeof asset) != "string") {
-		console.log('is image asset')
-		return true;
-	} else {
-		return false;
-	}
-}
-ViewRenderer.prototype._imageFromImageAsset = function(asset) {
-	var image = new imageModule.Image();
-	console.log('Set Image From Asset ' + asset);
-	image.src = asset;
-	return image;
-}
-ViewRenderer.prototype._isLocalFileAsset = function(asset) {
-	if (typeof asset == "string") {
-		var filepath = asset;
-		var fs = require("file-system");
-
-		if (filepath.indexOf('/') < 0) {
-			var savepath = fs.knownFolders.documents().path;
-			filepath = fs.path.join(savepath, asset);
-		}
-
-		return fs.File.exists(filepath);
-	}
-	return false;
-}
-
-ViewRenderer.prototype._imageFromLocalFileAsset = function(asset) {
-	if (typeof asset == "string") {
-		var filepath = asset;
-
-		if (filepath.indexOf('/') < 0) {
-			var fs = require("file-system");
-			var savepath = fs.knownFolders.documents().path;
-			filepath = fs.path.join(savepath, asset);
-		}
-
-		var image = new imageModule.Image();
-		image.src = filepath;
-		return image;
-	}
-	throw 'Expected file path: ' + (typeof asset);
-}
-
-
-
 ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 
 	var me = this;
@@ -1337,79 +1225,41 @@ ViewRenderer.prototype.renderButtonsetButton = function(container, field) {
 
 
 	imageStack.addChild(stackLayout);
+	me.addTapActionListener(stackLayout, field);
 
-
-	if (field.icon) {
-		var icon = field.icon;
-
-		if (typeof icon == 'string'&&icon.indexOf('{')==-1&&icon.indexOf('/')==-1){
-			throw 'No longer supporting param icons without `{}`: '+icon;
-		}
-
-		var uiimage= me._createImage(icon);
-		
-		if(uiimage){
-			stackLayout.addChild(uiimage);
-
-			if (field.stretch) {
-				uiimage.stretch = field.stretch;
-			}
-
-
-			if (field.label) {
-				renderLabel(imageStack, {
-					value: field.label
-				});
-			}
-
-			me.addTapActionListener(stackLayout, field);
-			return stackLayout;
-		}
-
-
-
-		//TODO: remove unreachable code!
-
-		getConfiguration().getImage(icon)
-
-			.then(function(imgPath) {
-
-				//console.log('Got Buttonset Image path: '+imgPath);
-
-				var image = new imageModule.Image();
-				image.src = imgPath;
-				stackLayout.addChild(image);
-
-				if (field.label) {
-					renderLabel(imageStack, {
-						value: field.label
-					})
-				}
-
-				if (field.stretch) {
-					image.stretch = field.stretch;
-				}
-
-
-
-			})
-			.catch(function(err) {
-				console.log("Field Button Icon From Configuration Variable("+icon+") Error: " + err);
-				//Still render the label.
-				renderLabel(imageStack, {
-					value: field.label
-				})
-			});
-
-	} else {
-
+	if (!field.icon) {
 		me.renderButton(stackLayout, field);
+		return stackLayout;
 	}
 
-	me.addTapActionListener(stackLayout, field);
+	
+	var icon = field.icon;
+
+	if (typeof icon == 'string'&&icon.indexOf('{')==-1&&icon.indexOf('/')==-1){
+		throw 'No longer supporting param icons without `{}`: '+icon;
+	}
+
+	var uiimage= me._createImage(icon);
+	
+	if(uiimage){
+		stackLayout.addChild(uiimage);
+
+		if (field.stretch) {
+			uiimage.stretch = field.stretch;
+		}
+
+
+		if (field.label) {
+			renderLabel(imageStack, {
+				value: field.label
+			});
+		}
+
+		return stackLayout;
+	}
+
+	
 	return stackLayout;
-
-
 
 }
 
@@ -1570,6 +1420,8 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 
 ViewRenderer.prototype._showSubform = function(field, callback) {
 
+	var me = this;
+
 	if(!(field.form||field.name||field.view)){
 		
 
@@ -1585,7 +1437,29 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 		field.form=field.name;
 	}
 
-	var me = this;
+
+	if(field.permissions&&field.permissions.length){
+
+		me._app().requirePermissionFor(field.permissions).then(function(){
+			me._showSubform(extend({}, field, {permissions:false}));
+		}).catch(function(err){
+
+
+			var eventData = {
+				eventName: 'deniedPermissionTo',
+				object: me,
+				error:err
+			};
+			me.notify(eventData);
+
+
+		});
+
+		return;
+	}
+
+
+	
 	var model=me._model;
 	
 		var chain = callback;
@@ -1625,6 +1499,8 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 	//Need Context options for navigation before _pushSubform
 	//becuase, _pushSubform clears the model!
 	var contextOptions = me._contextOptionsFromField(field);
+
+
 	if(_isObject(model[field.name])){
 		contextOptions.data=extend(contextOptions.data||{}, JSON.parse(JSON.stringify(model[field.name])));
 	}
@@ -1974,7 +1850,8 @@ ViewRenderer.prototype._renderFields = function(container, fields) {
 				elements.push(me.renderField(container, field));
 			}catch(e){
 				console.error(e);
-				throw 'Exception rendering fields['+i+']: '+JSON.stringify(fields);
+				console.error(e.stack);
+				throw 'Exception rendering fields['+i+']: '+JSON.stringify(field);
 			}
 		});
 		return elements;
@@ -2052,9 +1929,9 @@ ViewRenderer.prototype.renderLayout = function(container, field) {
 
 ViewRenderer.prototype.renderSpinner = function(container, field) {
 
-
+	var me=this;
 	if(field.condition){
-		return this._renderConditionalFieldset(container, {
+		return me._renderConditionalFieldset(container, {
 			"type":"fieldset",
 			"condition":field.condition,
 			"fields":[{
@@ -2066,6 +1943,7 @@ ViewRenderer.prototype.renderSpinner = function(container, field) {
 	var indicator = new activityIndicatorModule.ActivityIndicator();
 	indicator.width = 100;
 	indicator.height = 100;
+	me._addClass(indicator, "activity-indicator");
 
 	indicator.busy=true;
 
@@ -2201,6 +2079,8 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 		var node = me.getElementById(field.position);
 		if (node) {
 			container = node;
+		}else{
+			console.error('Did not find element with id: '+field.position);
 		}
 
 
@@ -2400,13 +2280,7 @@ ViewRenderer.prototype.renderField = function(defaultParentNode, field) {
 ViewRenderer.prototype.hasView = function(formName) {
 
 	var me = this
-	var forms = global.parameters.views;
-
-	if (typeof forms == 'string' && forms[0] == "{") {
-		forms = me._parse(forms);
-	}
-
-	return !!forms[formName];
+	return me._getBestFieldSetDefinition(['views', 'forms', 'lists', 'default-views'], formName)!==false;
 
 
 }
@@ -2424,6 +2298,9 @@ ViewRenderer.prototype.renderView = function(page, fields) {
  	model.on(Observable.propertyChangeEvent, function (PropertyChangeData) {
         console.log(me.getNamedViewStackPath()+'.'+PropertyChangeData.propertyName+' changed: '+ JSON.stringify(PropertyChangeData.value));
     });
+
+ 	me._initModel(model);
+    
 
  	me._model=model;
 	me._page = page;
@@ -2567,6 +2444,7 @@ ViewRenderer.prototype._getBestFieldSetDefinition = function(name, view) {
 
 	return false
 }
+
 
 
 /**

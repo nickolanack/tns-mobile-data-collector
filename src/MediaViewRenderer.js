@@ -55,7 +55,13 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 		labelForImage: "Add Image",
 		labelForVideo: "Add Video",
 		labelForAudio: "Add Audio",
-		labelForImageLibrary:"Library"
+		labelForImageLibrary:"Library",
+
+		iconForRemoveImage:"{remove-media}",
+		iconForRemoveVideo:"{remove-media}",
+		iconForRemoveAudio:"{remove-media}",
+		imageTapToRemove:false
+
 
 
 
@@ -94,6 +100,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 			var renderImageAsset=function(imageAsset, imagePath){
 
+
 				console.log('renderImageAsset '+imageAsset+':'+imagePath);
 
 				//var imageAssetModule = require("tns-core-modules/image-asset/image-asset");
@@ -105,49 +112,76 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 						imagePath = name;
 						imageAssets.push(name);
 						me._renderer._model.set(field.name, imageAssets);
-					});
+					}).catch(function(e){
+						console.error(e);
+						console.error("Failed to store image asset");
+					})
 
 				}
 
 				//TODO: force ios refresh after append image!!
+				
+				var imageViewBtn={
+					"icon": imageAsset,
+					"stretch": "aspectFill",
+					"className": "image-icon",
+					"action": "form",
+					"name": "image-viewer",
+					"fields": [{
+						"type": "image",
+						"image": function() {
+							return imagePath;
+						}
+					}]
+				};
 
-				var buttonset = me._renderer.renderButtonset(mediaSelection, {
-					"className": 'image-selection',
-					"buttons": [{
+				var imageRemoveBtn={
+					"icon": mediaOptions.iconForRemoveImage,
+					"className": "remove-media",
+					"action": function() {
+						
+						var i = imageAssets.indexOf(imagePath);
+						if (i >= 0) {
+							
+							mediaSelection.removeChild(buttonset);
+							imageAssets.splice(i, 1);
+							me._renderer._model.set(field.name, imageAssets);
+
+							if (field.required && imageAssets.length == 0) {
+								addPhoto(function(err, asset){
+									if(err){
+										imageAssets.splice(i, 0, imagePath);
+										renderImageAsset(imageAsset, imagePath); //restore;
+
+									}
+								});
+
+								return;
+							}
+
+
+						}
+					}
+				};
+
+				if(mediaOptions.imageTapToRemove){
+					imageViewBtn={
 						"icon": imageAsset,
 						"stretch": "aspectFill",
 						"className": "image-icon",
-						"action": "form",
-						"name": "image-viewer",
-						"fields": [{
-							"type": "image",
-							"image": function() {
-								return imagePath;
-							}
-						}]
+						"action": imageRemoveBtn.action
+					};
+				}
 
-					}, {
-						"icon": "{remove-media}",
-						"className": "remove-media",
-						"action": function() {
-							mediaSelection.removeChild(buttonset);
-							var i = imageAssets.indexOf(imagePath);
-							if (i >= 0) {
-								imageAssets.splice(i, 1);
-								me._renderer._model.set(field.name, imageAssets);
-
-								if (field.required && imageAssets.length == 0) {
-									addPhoto();
-								}
-							}
-						}
-					}]
+				var buttonset = me._renderer.renderButtonset(mediaSelection, {
+					"className": 'image-selection',
+					"buttons": [imageViewBtn, imageRemoveBtn]
 				});
 			}
 
 
 
-			var addPhoto = function() {
+			var addPhoto = function(fn) {
 
 
 				if(field.limit&&imageAssets.length>=field.limit){
@@ -165,9 +199,15 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 					.then(function(imageAsset) {
 
 						renderImageAsset(imageAsset);
+						if(fn){
+							fn(null, imageAsset);
+						}
 
 					}).catch(function(err) {
 						console.log("Camera Error -> " + err);
+						if(fn){
+							fn(err, null);
+						}
 					});
 			}
 
@@ -217,7 +257,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 									"video": data.file
 								}]
 							}, {
-								"icon": "{remove-media}",
+								"icon": mediaOptions.iconForRemoveVideo,
 								"className": "remove-media",
 								"action": function() {
 
@@ -361,6 +401,13 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			return;
 		}
 
+		
+
+
+
+
+		
+
 		me._renderer._showSubform({
 			"className": "submit",
 
@@ -457,7 +504,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 								}
 							}, {
-								"icon": "{remove-media}",
+								"icon": mediaOptions.iconForRemoveAudio,
 
 								"className": "remove-media",
 
@@ -486,6 +533,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 				}
 			]
 		});
+
 
 	}
 
@@ -554,17 +602,13 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 			console.log(arguments);
 		}
 	};
+
 	if (application.android) {
-		var permissions = require('nativescript-permissions');
-		permissions.requestPermission(android.Manifest.permission.RECORD_AUDIO, "Let me hear your thoughts...")
-			.then(function() {})
-
-
 		recorderOptions.source = android.media.MediaRecorder.AudioSource.MIC;
-
-
 	}
 
+
+	
 
 
 	//var permissions = require('nativescript-permissions');
@@ -578,7 +622,7 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 	var interval = null;
 	var secondsx10 = 0;
 	me._renderer._model.set('seconds', 0.0);
-	me._renderer._model.set('labelState', 'Record');
+	me._renderer._model.set('labelState', 'Press To Record');
 	me._renderer._model.set('recording', false);
 	me._renderer._model.set('playing', false);
 	me._renderer._model.set('hasAudio', false);
@@ -590,57 +634,60 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 			"label": "{data.labelState}",
 			"className": "record-audio",
 			"action": function() {
-				if (!me._renderer._model.get('recording')) {
 
-					var TNSRecorder = require("nativescript-audio").TNSRecorder;
-					if (!me._renderer._recorder) {
-						me._renderer._recorder = new TNSRecorder();
-					}
+				require('../').DataAcquisitionApplication.SharedInstance().requireAccessToMicrophone().then(function(recorder) {
+	
+				
 
 
 
-					if (TNSRecorder.CAN_RECORD()) {
-						console.log('Ready to record');
-						me._renderer._recorder.start(recorderOptions).then(function(something) {
+					if (!me._renderer._model.get('recording')) {
+
+						
+							console.log('Ready to record');
+							recorder.start(recorderOptions).then(function(something) {
 
 
-							console.log('Recording');
-							console.log(something);
-							secondsx10 = 0;
+								console.log('Recording');
+								console.log(something);
+								secondsx10 = 0;
 
-							me._renderer._model.set('recording', true);
-							me._renderer._model.set('labelState', 'Stop Recording');
-							me._renderer._model.set('seconds', 0.0);
-							me._renderer._model.set('hasAudio', false);
-
-
-							interval = setInterval(function() {
-								secondsx10 += 1;
-								me._renderer._model.set('seconds', Math.round(secondsx10) / 10.0);
-							}, 100);
+								me._renderer._model.set('recording', true);
+								me._renderer._model.set('labelState', 'Press To Stop Recording');
+								me._renderer._model.set('seconds', 0.0);
+								me._renderer._model.set('hasAudio', false);
 
 
-						}).catch(function(e) {
-							console.log("Audio Error " + e);
-						});
+								interval = setInterval(function() {
+									secondsx10 += 1;
+									me._renderer._model.set('seconds', Math.round(secondsx10) / 10.0);
+								}, 100);
+
+
+							}).catch(function(e) {
+								console.log("Audio Error " + e);
+							});
+						
+
+
+
 					} else {
 
-						console.log('Not Ready')
+						recorder.stop();
+						me._renderer._model.set('recording', false);
+						me._renderer._model.set('labelState', 'Press To Record Again');
+						me._renderer._model.set('audio', filepath);
+						me._renderer._model.set('hasAudio', true);
+						if (interval) {
+							clearInterval(interval);
+						}
 					}
 
+				}).catch(function(err){
+					console.error(err);
+					console.error('failed to get micropone');
+				});
 
-
-				} else {
-
-					me._renderer._recorder.stop();
-					me._renderer._model.set('recording', false);
-					me._renderer._model.set('labelState', 'Record Again');
-					me._renderer._model.set('audio', filepath);
-					me._renderer._model.set('hasAudio', true);
-					if (interval) {
-						clearInterval(interval);
-					}
-				}
 
 			}
 		}]
@@ -693,7 +740,7 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 			"enabled": "{data.hasAudio}",
 			"action": function() {
 
-				me._renderer._model.set('labelState', 'Record');
+				me._renderer._model.set('labelState', 'Press To Record');
 				me._renderer._model.set('hasAudio', false);
 				me._renderer._model.set('seconds', '0.0');
 			}

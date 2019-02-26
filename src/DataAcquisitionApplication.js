@@ -14,6 +14,10 @@ var instance; //Deprecated!
 var _isArray = function(thing) {
     return Object.prototype.toString.call(thing) === "[object Array]";
 }
+var _isObject = function(thing) {
+    return Object.prototype.toString.call(thing) === "[object Object]";
+}
+
 
 function DataAcquisitionApplication(params) {
 
@@ -32,19 +36,19 @@ function DataAcquisitionApplication(params) {
 
     options = params;
     me.options = params;
-    if(!me.options.parameters){
+    if (!me.options.parameters) {
         throw 'Requires parameters';
     }
 
     instance = me;
 
-    me._client().on('wentOnline',function(){
+    me._client().on('wentOnline', function() {
         console.log('got went online');
         me._setOnline();
 
     });
 
-    me._client().on('wentOffline',function(){
+    me._client().on('wentOffline', function() {
         console.log('got went offline');
         me._setOffline();
     });
@@ -83,55 +87,149 @@ DataAcquisitionApplication.prototype._client = function() {
     return require('../').CoreClient.SharedInstance();
 }
 
-DataAcquisitionApplication.prototype.handleServerMessage=function(message, popover){
+DataAcquisitionApplication.prototype.handleServerMessage = function(message, popover) {
 
-    var me=this;
+    var me = this;
 
-    if(message.data){
-        console.log('Extend data: '+JSON.stringify(message.data));
+    if (message.data) {
+        console.log('Extend data: ' + JSON.stringify(message.data));
         me._renderer().extendCurrentData(message.data);
     }
 
-    if(message.parameters){
-        console.log('Extend parameters: '+JSON.stringify(message.parameters));
+    if (message.parameters) {
+        console.log('Extend parameters: ' + JSON.stringify(message.parameters));
         me._config().extendDefaultParameters(message.parameters);
     }
 
-    if(message.logout){
+    if (message.logout) {
         console.log('Forced relogin');
         me._client().relogin();
     }
 
 
-    if(message.text||message.title){
+    if (message.text || message.title) {
 
 
-            
-            if(popover){
-                if(message.type&&message.type!=="success"){
-                    if(message.type=="error"){
-                         return popover.showError(message.title||" ", message.text||" ", message.button||"Close");
-                    }
-                         
-                    return popover.showWarning(message.title||" ", message.text||" ", message.button||"Close");
-                    
+
+        if (popover) {
+            if (message.type && message.type !== "success") {
+                if (message.type == "error") {
+                    return popover.showError(message.title || " ", message.text || " ", message.button || "Close");
                 }
-                
-                return popover.showSuccess(message.title||" ", message.text||" ", message.button||"Close");
-                
-               
+
+                return popover.showWarning(message.title || " ", message.text || " ", message.button || "Close");
+
             }
 
-            return me.getMessageManager().alert({
-                "title":message.title||" ",
-                "message":message.text||" "
+            return popover.showSuccess(message.title || " ", message.text || " ", message.button || "Close");
+
+
+        }
+
+        return me.getMessageManager().alert({
+            "title": message.title || " ",
+            "message": message.text || " "
+        });
+
+
+    }
+
+
+
+}
+DataAcquisitionApplication.prototype.requirePermissionFor = function(item) {
+    var me = this
+
+    if (_isArray(item)) {
+
+        if (item.length == 1) {
+            item = item[0];
+        } else {
+
+            return me.requirePermissionFor(item[0]).then(function() {
+                return me.requirePermissionFor(item.slice(1));
             });
 
-            
         }
+
+    }
+
+
+
+    if (item == "camera") {
+        return me.requireAccessToCamera();
+    }
+
+    if (item == "gps") {
+        return me.requireAccessToGPS();
+    }
+
+    if (item == "microphone") {
+        return me.requireAccessToMicrophone();
+    }
+
+    throw 'Unknown device permission: microphone.' + item;
+
+}
+
+
+DataAcquisitionApplication.prototype.requireAccessToMicrophone = function() {
+
+    var me = this;
+
+    return new Promise(function(resolve, reject) {
+
+
+        var application = require("application");
+
+        if (application.android) {
+            var permissions = require('nativescript-permissions');
+            permissions.requestPermission(android.Manifest.permission.RECORD_AUDIO, "Let me hear your thoughts...")
+                .then(function() {
+                    resolve(me._getMicrophone());
+                }).catch(reject);
+            return;
+        }
+
+
+
+        resolve(me._getMicrophone());
+
+
+    });
+
+
+
+}
+
+DataAcquisitionApplication.prototype._getMicrophone = function() {
+
+
+    var me = this;
+
+    return new Promise(function(resolve, reject) {
+
+
+        if (!me._recorder) {
+
+            var TNSRecorder = require("nativescript-audio").TNSRecorder;
+
+            if (!TNSRecorder.CAN_RECORD()) {
+                throw 'No microphone available';
+            }
+
+            me._recorder = new TNSRecorder();
+           
+        }
+
+
+
+         resolve(me._recorder);
 
         
 
+
+    });
 
 }
 
@@ -147,8 +245,15 @@ DataAcquisitionApplication.prototype.requireAccessToCamera = function() {
         console.log('Request Camera');
 
 
-        camera.requestPermissions();
-        resolve(camera);
+        camera.requestPermissions().then(function() {
+            resolve(camera);
+        }).catch(function(err) {
+
+            console.error(err);
+            console.error("failed to get camera permission");
+            reject(err);
+        });
+
 
 
     });
@@ -180,7 +285,7 @@ DataAcquisitionApplication.prototype.requireAccessToGPS = function() {
                 resolve(me.getGeolocation());
 
             }).catch(function(e) {
-                console.log('Access To GPS Failed ' + e);
+                console.error('Access To GPS Failed ' + e);
                 reject(e);
             });
         });
@@ -215,7 +320,7 @@ DataAcquisitionApplication.prototype.getMessageManager = function() {
 
     var Messages = require('../').Messages;
     var messages = new Messages(me.options.parameters);
-    
+
 
 
     me._messageManager = messages;
@@ -270,7 +375,7 @@ DataAcquisitionApplication.prototype._submitData = function(data, callback) {
     var formData = me._renderTemplate(template, data);
 
 
-    console.log("Processed Form Data ("+formName+"): " + JSON.stringify(formData, null, '   '));
+    console.log("Processed Form Data (" + formName + "): " + JSON.stringify(formData, null, '   '));
 
     me._submitHandler(formData, formName).then(function(result) {
 
@@ -340,21 +445,21 @@ DataAcquisitionApplication.prototype.isOnline = function() {
 DataAcquisitionApplication.prototype._setOnline = function() {
     var me = this;
     me._online = true;
-    if(me._processOfflineIterval){
+    if (me._processOfflineIterval) {
         clearInterval(me._processOfflineIterval);
-        me._processOfflineIterval=setInterval(function(){
+        me._processOfflineIterval = setInterval(function() {
 
-             me._processOfflineForms();
+            me._processOfflineForms();
 
-        }, 60*1000);
+        }, 60 * 1000);
     }
     me._processOfflineForms();
 }
 
 DataAcquisitionApplication.prototype._setOffline = function() {
-    var me=this;
+    var me = this;
 
-    if(me._processOfflineIterval){
+    if (me._processOfflineIterval) {
         clearInterval(me._processOfflineIterval);
     }
 
@@ -367,7 +472,7 @@ DataAcquisitionApplication.prototype._processOfflineForms = function() {
 
     var me = this;
 
-    me.getQueuedForms().then(function(list){
+    me.getQueuedForms().then(function(list) {
 
         console.log('Process Offline Forms: ' + list.length);
 
@@ -389,11 +494,11 @@ DataAcquisitionApplication.prototype._processOfflineForms = function() {
             });
         }
 
-    }).catch(function(e){
-        console.log('Error getting list of queued items: '+JSON.stringify(e.message||e));
+    }).catch(function(e) {
+        console.log('Error getting list of queued items: ' + JSON.stringify(e.message || e));
     });
 
-    
+
 
 };
 DataAcquisitionApplication.prototype._offlineFormPaths = function() {
@@ -439,24 +544,24 @@ DataAcquisitionApplication.prototype.getQueuedForms = function() {
         var check = function() {
             if (errors + forms.length == paths.length) {
 
-                var queueable=me._config().get('queuableForms', null);
-                if(_isArray(queueable)){
+                var queueable = me._config().get('queuableForms', null);
+                if (_isArray(queueable)) {
 
-                     resolve(forms.filter(function(f){
-                        return queueable.indexOf(f._formName)>=0;
-                     }));
+                    resolve(forms.filter(function(f) {
+                        return queueable.indexOf(f._formName) >= 0;
+                    }));
 
-                     var invalidForms=forms.filter(function(f){
-                        return queueable.indexOf(f._formName)<0;
-                     });
+                    var invalidForms = forms.filter(function(f) {
+                        return queueable.indexOf(f._formName) < 0;
+                    });
 
-                     me._cleanUpInvalidForms(invalidForms);
+                    me._cleanUpInvalidForms(invalidForms);
 
-                }else{
+                } else {
                     resolve(forms);
                 }
 
-                
+
             }
         }
 
@@ -465,13 +570,12 @@ DataAcquisitionApplication.prototype.getQueuedForms = function() {
 
 
 
-
                 forms.push(data);
                 check();
 
 
             }).catch(function(err) {
-                console.log('getQueuedForms Error: '+JSON.stringify(err.message||err));
+                console.log('getQueuedForms Error: ' + JSON.stringify(err.message || err));
                 errors++;
                 check();
             })
@@ -482,7 +586,7 @@ DataAcquisitionApplication.prototype.getQueuedForms = function() {
 }
 
 DataAcquisitionApplication.prototype._cleanUpInvalidForms = function(forms) {
-    console.log('Should clean up invalid forms: '+JSON.stringify(forms));
+    console.log('Should clean up invalid forms: ' + JSON.stringify(forms));
 };
 
 
@@ -543,14 +647,14 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
     var mediaFields = ['media', 'media-audio', 'media-video', 'media-image']
 
     file.readText().then(function(content) {
-         var data;
-        try{
-             data=JSON.parse(content);
-         }catch(e){
-            console.log('Invalid JSON: '+content);
+        var data;
+        try {
+            data = JSON.parse(content);
+        } catch (e) {
+            console.log('Invalid JSON: ' + content);
             throw e;
-         }
-       
+        }
+
 
         console.log('Read: ' + content)
 
@@ -577,7 +681,7 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 
             }).catch(function(err) {
-                console.error('Image Upload Error => ' + JSON.stringify(err.message||err));
+                console.error('Image Upload Error => ' + JSON.stringify(err.message || err));
                 callback(err);
             })
             return;
@@ -587,27 +691,27 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
         console.log('About to submit form');
         console.log(JSON.stringify(data));
-        
-        data["media-metadata-set"]=media.map(function(item) {
+
+        data["media-metadata-set"] = media.map(function(item) {
             return mediaData(item);
         });
 
-        data["media-urls"]=data["media-metadata-set"].map(function(item) {
-            var preffered='url';
-            var alsoPushTo=null;
-            if(item.type){
-               preffered=item.type;
-               var alsoPushToKey='media-'+preffered+'s';
-                
-                if(!data[alsoPushToKey]){
-                    data[alsoPushToKey]=[];
-                    alsoPushTo=data[alsoPushToKey];
+        data["media-urls"] = data["media-metadata-set"].map(function(item) {
+            var preffered = 'url';
+            var alsoPushTo = null;
+            if (item.type) {
+                preffered = item.type;
+                var alsoPushToKey = 'media-' + preffered + 's';
+
+                if (!data[alsoPushToKey]) {
+                    data[alsoPushToKey] = [];
+                    alsoPushTo = data[alsoPushToKey];
                 }
 
             }
             //var meta=mediaData(item);
-            var url=item[preffered]||item.url||item.image||item.video||item.audio||item.document;
-            if(alsoPushTo){
+            var url = item[preffered] || item.url || item.image || item.video || item.audio || item.document;
+            if (alsoPushTo) {
                 alsoPushTo.push(url);
             }
             return url;
@@ -639,26 +743,26 @@ DataAcquisitionApplication.prototype._processFormFilePath = function(filepath, c
 
 var mediaItemsThatNeedUploading = function(fileArray) {
     return fileArray.filter(function(mediaFile) {
-        return hasFileForMedia(mediaFile)&&(!hasUrlForMedia(mediaFile));
+        return hasFileForMedia(mediaFile) && (!hasUrlForMedia(mediaFile));
     });
 }
 var mediaData = function(filename) {
 
     var fileMetaName = filename + '.json';
     fileMetaName = fileMetaName.split('/').pop()
-   
-    var filepath=fs.path.join(fs.knownFolders.documents().path, fileMetaName);
 
-    if(!fs.File.exists(filepath)){
+    var filepath = fs.path.join(fs.knownFolders.documents().path, fileMetaName);
+
+    if (!fs.File.exists(filepath)) {
         //should only be here if filename is an actual url!
         return {
-            "image":filename,
-            "type":"image",
-            "html":"<img src=\""+filename+"\" />"
+            "image": filename,
+            "type": "image",
+            "html": "<img src=\"" + filename + "\" />"
         };
     }
 
-     var file = fs.File.fromPath(filepath);
+    var file = fs.File.fromPath(filepath);
 
     // Writing text to the file.
     var data = file.readTextSync(function(err) {
@@ -670,7 +774,7 @@ var mediaData = function(filename) {
     try {
         json = JSON.parse(data);
     } catch (e) {
-        console.log("Invalid JSON: ("+file.path+":"+filename+")"+data);
+        console.log("Invalid JSON: (" + file.path + ":" + filename + ")" + data);
         throw e;
     }
 
@@ -731,27 +835,29 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
             "File-Name": filename
         },
         description: "{ 'uploading': " + filename + " }",
-       // androidDisplayNotificationProgress:false
+        // androidDisplayNotificationProgress:false
     };
 
 
     console.log('Generating Promise For File Upload');
 
     console.log("about to upload: " + filePath);
-    var params = [
-            { name: "upload", filename: filePath, mimeType: 'image/png' }
-        ];
+    var params = [{
+        name: "upload",
+        filename: filePath,
+        mimeType: 'image/png'
+    }];
     var task = session.multipartUpload(params, request);
 
-    if(!me._tasks){
-        me._tasks=[];
+    if (!me._tasks) {
+        me._tasks = [];
     }
     me._tasks.push(task);
-    if(!me._sessions){
-        me._sessions=[];
+    if (!me._sessions) {
+        me._sessions = [];
     }
     me._sessions.push(session);
-   
+
 
 
     me._taskIndicatorStart(finished, total);
@@ -762,22 +868,21 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
         console.log('Executing Promise For File Upload');
 
 
-        
 
         task.on("progress", function(value) {
             console.log("Upload Progress: " + JSON.stringify(value));
-            
-            var percent=(100 * parseInt(value.currentBytes) * (finished + 1)) / (parseInt(value.totalBytes) * total);
+
+            var percent = (100 * parseInt(value.currentBytes) * (finished + 1)) / (parseInt(value.totalBytes) * total);
             console.log("Calculated: " + percent);
             me._taskIndicatorProgress('Uploading ' + (finished + 1) + " of " + total, percent);
         });
         task.on("error", function(err) {
-            console.log("Error Uploading File: "+JSON.stringify(err.eventName||err.message||e));
+            console.log("Error Uploading File: " + JSON.stringify(err.eventName || err.message || e));
             reject(err);
             me._taskIndicatorComplete(finished + 1, total);
         });
         task.on("complete", function(response) {
-            console.log("Upload Complete: "+JSON.stringify(response));
+            console.log("Upload Complete: " + JSON.stringify(response));
             me._taskIndicatorComplete(finished + 1, total);
         });
 
@@ -785,11 +890,11 @@ DataAcquisitionApplication.prototype.uploadMediaItem = function(filename, finish
 
             console.log('Response: ' + response.data + " " + url);
             var fileMeta;
-            try{
+            try {
                 fileMeta = JSON.parse(response.data);
-            }catch(err){
+            } catch (err) {
 
-                console.log('Upload Error => ' + JSON.stringify(err) + ' ' +response);
+                console.log('Upload Error => ' + JSON.stringify(err) + ' ' + response);
                 reject(err);
 
                 return;
@@ -828,7 +933,7 @@ var hasUrlForMedia = function(filename) {
 
 var hasFileForMedia = function(filename) {
 
-    if(fs.File.exists(filename)){
+    if (fs.File.exists(filename)) {
         return true;
     }
 
@@ -885,9 +990,9 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
             me._processFormFile(file, null, function(err, response) {
                 if (err) {
 
-                    var queueable=me._config().get('queuableForms', null);
-                    if(_isArray(queueable)){
-                        if(queueable.indexOf(formName)<0){
+                    var queueable = me._config().get('queuableForms', null);
+                    if (_isArray(queueable)) {
+                        if (queueable.indexOf(formName) < 0) {
 
                             var eventData = {
                                 eventName: "submitFormError",
@@ -913,7 +1018,7 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
                 var eventData = {
                     eventName: "submitFormSuccess",
                     object: me,
-                    response:response
+                    response: response
                 };
                 callback(callbackData);
                 me.notify(eventData);
@@ -922,9 +1027,9 @@ DataAcquisitionApplication.prototype.submitForm = function(formData, formName, c
             return;
         }
 
-        var queueable=me._config().get('queuableForms', null);
-        if(_isArray(queueable)){
-            if(queueable.indexOf(formName)<0){
+        var queueable = me._config().get('queuableForms', null);
+        if (_isArray(queueable)) {
+            if (queueable.indexOf(formName) < 0) {
                 var eventData = {
                     eventName: "offlineFormError",
                     object: me
@@ -992,6 +1097,215 @@ DataAcquisitionApplication.prototype._storeFormJson = function(data, name) {
 
 };
 
+
+DataAcquisitionApplication.prototype.renderApplication = function(page) {
+
+
+
+    var me = this;
+    if (me.options.parameters.shouldRegisterDevice !== false) {
+
+        console.log('Starting Login process');
+
+        var label = page.getViewById("loading-label");
+        var setLabel = function(text) {
+            if (label) {
+                label.text = text;
+            }
+        }
+
+        setLabel("Authenticating");
+        require('../').Account.SharedInstance().login().then(function() {
+            return me._runApplication(page);
+        }).catch(function(e) {
+            console.log('Application Startup Error With Registration: ' + JSON.stringify(e));
+            console.error(e);
+            console.error(e.stack);
+        });
+
+        return;
+    }
+
+
+    console.log('Skipped Login process');
+
+    me._runApplication(page).catch(function(e) {
+        console.log('Application Startup Error No Registration: ' + JSON.stringify(e));
+        console.error(e);
+        console.error(e.stack);
+    });
+
+
+};
+
+
+DataAcquisitionApplication.prototype._runApplication = function(page) {
+
+    var me = this;
+
+    console.log('Starting Configuration Stage');
+
+    var label = page.getViewById("loading-label");
+    var indicator = page.getViewById("loading-indicator");
+
+    var setLabel = function(text) {
+        if (label) {
+            label.text = text;
+        }
+    }
+    var removeLabel = function() {
+        if (label) {
+            label.parent.removeChild(label);
+        }
+    }
+    var removeIndicator = function() {
+        if (indicator) {
+            indicator.busy = false;
+        }
+    }
+    setLabel("Loading configuration");
+
+
+    var configuration = me._config();
+    configuration.on('downloadingDependencies', function(event) {
+        setLabel("Parsing assets");
+    });
+
+    var counter = 0;
+    configuration.on('downloadedAsset', function(event) {
+        setLabel("Downloading assets " + (counter++));
+    });
+
+    configuration.on('downloadedDependencies', function(event) {
+        setLabel("Checking offline queue")
+    });
+
+
+
+    if (me.options.parameters.configuration === false || _isObject(me.options.parameters.configuration)) {
+        configuration.setDefaultParameters(me.options.parameters.configuration || {});
+    } else {
+        console.log(JSON.stringify(me.options.parameters));
+    }
+
+
+
+    return configuration.getImage('appLogo').then(function(imageSource) {
+
+        try {
+            page.getViewById("logo").src = imageSource;
+        } catch (err) {
+            console.error(err);
+            console.error("Failed to render logo: " + imageSource);
+            console.error(err.trace);
+        }
+        removeIndicator();
+
+
+
+        var showSplashScreenFor = parseInt(configuration.get('splashScreenDuration', "5")) * 1000;
+        console.log('Show Splash Screen: ' + showSplashScreenFor);
+
+        var intCount = 0;
+        var splashInterval = setInterval(function() {
+            setLabel("" + (parseInt(showSplashScreenFor / 1000) - (intCount++)) + " Remaining");
+        }, 1000);
+        setTimeout(function() {
+            clearInterval(splashInterval);
+            var frameModule = require("ui/frame");
+            var topmost = frameModule.topmost();
+
+            if (topmost.android) {
+                //topmost.android.cachePagesOnNavigate = true;
+            }
+
+
+
+            var acceptedTermsFile = fs.path.join(fs.knownFolders.documents().path, "acceptedterms.json");
+            var tutorialFile = fs.path.join(fs.knownFolders.documents().path, "viewedtutorial.json");
+
+            var showMain = function() {
+
+                console.log("showMain");
+
+                var tutorialFileExists = fs.File.exists(tutorialFile);
+                var showTutorial = configuration.get("showTutorial", true);
+
+                if (tutorialFileExists || (!showTutorial) || (!me._renderer().hasView('tutorial'))) {
+
+                    console.log("Skip Tutorial: `showTutorial`=" + (showTutorial ? "true" : "false") + " `tutorialWasViewed`=" + (tutorialFileExists ? "true" : "false"));
+                    // return;
+                    topmost.navigate({
+
+                        moduleName: "views/form/form",
+                        clearHistory: true,
+                        //backstackVisible:false,
+                        context: {
+                            form: configuration.get("mainView", "menu")
+                        }
+
+                    });
+                    return;
+                }
+
+                var file = fs.File.fromPath(tutorialFile);
+                file.writeText("{}");
+
+                topmost.navigate({
+
+                    moduleName: "views/form/form",
+                    clearHistory: true,
+                    //backstackVisible:false,
+                    context: {
+                        form: "tutorial",
+                        events: {
+                            "complete": function() {
+                                console.log("User Triggered Event (tutorial): `complete` showMain()");
+                                showMain();
+                            }
+                        }
+                    }
+
+                });
+
+            };
+
+            var acceptedTermsFileExists = fs.File.exists(acceptedTermsFile);
+            var showTerms = configuration.get("showTerms", true);
+
+            if (acceptedTermsFileExists || (!showTerms) || (!me._renderer().hasView('terms'))) {
+                console.log("Skip Terms Of Use: `showTerms`=" + (showTerms ? "true" : "false") + " `acceptedTerms`=" + (acceptedTermsFileExists ? "true" : "false"));
+                showMain();
+                return;
+            }
+
+            topmost.navigate({
+
+                moduleName: "views/form/form",
+                clearHistory: true,
+                //backstackVisible:false,
+                context: {
+                    form: "terms",
+                    events: {
+                        "accept": function() {
+                            console.log("User Triggered Event (terms): `accept` showMain()");
+                            var file = fs.File.fromPath(acceptedTermsFile);
+                            file.writeText("{}");
+                            showMain();
+                        }
+                    }
+                }
+
+            });
+
+
+        }, showSplashScreenFor);
+
+    });
+
+
+
+}
 
 
 module.exports = DataAcquisitionApplication;

@@ -13,13 +13,9 @@ var _isArray = function(thing) {
 }
 
 
-
-
-
-
-
-
-
+var _isObject = function(thing) {
+	return Object.prototype.toString.call(thing) === "[object Object]";
+}
 
 
 
@@ -46,6 +42,7 @@ function Configuration(client) {
 	var me = this;
 	me.client = client;
 	me._refreshCacheItems = true; //use cached items if available
+	me._refreshCacheImageItems=false;
 	me._defaultConfig = false;
 	me._configs = {};
 
@@ -59,9 +56,21 @@ function Configuration(client) {
 
 };
 
+try {
+
+	var observableModule = require("data/observable");
+	Configuration.prototype = new observableModule.Observable();
+
+} catch (e) {
+	/**
+	 * TODO: extend Observable or Mock object in a way that supports unit tests
+	 */
+	console.error('Unable to extend Observable!!!');
+}
+
 
 Configuration.prototype.hasImage = function(name) {
-	var me=this;
+	var me = this;
 	return fs.File.exists(me.imagePath(name));
 }
 
@@ -69,6 +78,7 @@ Configuration.prototype.hasImage = function(name) {
 Configuration.prototype.imagePath = function(name) {
 
 	if (typeof name != "string") {
+		console.error(new Error().stack);
 		throw 'Invalid imagePath name: ' + (typeof name) + " " + JSON.stringify(name);
 	}
 
@@ -84,7 +94,7 @@ Configuration.prototype.imagePath = function(name) {
 
 Configuration.prototype.saveImage = function(name, imgSource) {
 
-	var me=this;
+	var me = this;
 
 	var path = me.imagePath(name);
 	var saved = imgSource.saveToFile(path, "png");
@@ -106,12 +116,12 @@ Configuration.prototype.stylePath = function(name) {
 
 
 Configuration.prototype.hasStyle = function(name) {
-	var me=this;
+	var me = this;
 	return fs.File.exists(me.stylePath(name));
 }
 
 Configuration.prototype.saveStyle = function(name, styleString) {
-	var me =this;
+	var me = this;
 	var path = me.stylePath(name);
 	var file = fs.File.fromPath(path);
 
@@ -122,7 +132,7 @@ Configuration.prototype.saveStyle = function(name, styleString) {
 
 Configuration.prototype.saveConfig = function(name, json) {
 
-	var me=this;
+	var me = this;
 	var path = me.configurationPath(name);
 	var file = fs.File.fromPath(path);
 	console.log('Saved Config: ' + name + ": " + path + " => " + JSON.stringify(json, null, '  ')); // .substring(0, 50) + '...');
@@ -132,7 +142,7 @@ Configuration.prototype.saveConfig = function(name, json) {
 
 Configuration.prototype.readPath = function(name) {
 
-	var me=this;
+	var me = this;
 
 	var path = me.configurationPath(name);
 	var file = fs.File.fromPath(path);
@@ -148,17 +158,17 @@ Configuration.SharedInstance = function() {
 }
 
 Configuration.prototype.hasCachedImage = function(name) {
-	var me=this;
+	var me = this;
 	return me.hasImage(name);
 }
 
 Configuration.prototype.cachedImagePath = function(name) {
-	var me=this;
+	var me = this;
 	return me.imagePath(name);
 }
 
 Configuration.prototype.hasConfiguration = function(name) {
-	var me=this;
+	var me = this;
 	return fs.File.exists(me.configurationPath(name));
 }
 
@@ -202,10 +212,10 @@ Configuration.prototype.getConfiguration = function(name) {
 	return new Promise(function(resolve, reject) {
 
 		if (me._configs[name]) {
-			setTimeout(function(){
+			setTimeout(function() {
 				resolve(me._configs[name]);
-			},1);
-			
+			}, 1);
+
 			return;
 		}
 
@@ -256,6 +266,8 @@ Configuration.prototype.getConfiguration = function(name) {
 
 			me.saveConfig(name, config).then(function() {
 
+				me.downloadDependencies(name, config);
+
 			}).catch(function(e) {
 				console.log('Failed to save config: ' + name + ': ' + e);
 			});
@@ -286,28 +298,57 @@ Configuration.prototype._shouldUseConfigCacheItem = function(name) {
 }
 Configuration.prototype._shouldUseImageCacheItem = function(name, urlPath) {
 	var me = this;
+
+	var hasImg=me.hasImage(name);
+
+	if(!hasImg){
+		return false; //expired
+	}
+
 	return !me._imageItemIsExpired(name, urlPath);
 
 }
 Configuration.prototype._shouldUseStyleCacheItem = function(name) {
 	var me = this;
+
+
 	return !me._styleItemIsExpired(name);
 
 }
 
 Configuration.prototype._configItemIsExpired = function(name) {
 	var me = this;
-	return (!me.hasConfiguration(name))||(me._refreshCacheItems && me.getLocalDataModifiedDate(name) < me._refreshDate);
+	return (!me.hasConfiguration(name)) || (me._refreshCacheItems && me.getLocalDataModifiedDate(name) < me._refreshDate);
 
 }
 Configuration.prototype._imageItemIsExpired = function(name, urlPath) {
 	var me = this;
-	return (!me.hasImage(name))||(name!=urlPath&&me._refreshCacheItems && me._localImageModifiedDate(name) < me._refreshDate);
+	var hasImg=me.hasImage(name);
+
+	if(!hasImg){
+		return true; //force expired
+	}
+	if(!me.client.isOnline()){
+		return false;
+	}
+	var expired=name != urlPath && me._refreshCacheImageItems && me._localImageModifiedDate(name) < me._refreshDate;
+
+	console.log('check expired image: '+(expired?"expired":"all good"));
+
+
+	return expired;
 
 }
 Configuration.prototype._styleItemIsExpired = function(name) {
 	var me = this;
-	return (!me.hasStyle(name))||(me._refreshCacheItems && me._localStyleModifiedDate(name) < me._refreshDate);
+
+	var hasStyle=me.hasStyle(name);
+	if(hasStyle&&!me.client.isOnline()){
+		return false;
+	}
+
+
+	return (!hasStyle) || (me._refreshCacheItems && me._localStyleModifiedDate(name) < me._refreshDate);
 
 }
 
@@ -343,11 +384,11 @@ Configuration.prototype.getIncludes = function(config) {
  * Only for configuration files. JSON files!
  */
 Configuration.prototype.getLocalDataModifiedDate = function(name) {
-	var me=this;
+	var me = this;
 	return me._localDataModifiedDate(name);
 }
 Configuration.prototype._localDataModifiedDate = function(name) {
-	var me=this;
+	var me = this;
 	if (me.hasConfiguration(name)) {
 		var path = me.configurationPath(name);
 		var file = fs.File.fromPath(path);
@@ -356,7 +397,7 @@ Configuration.prototype._localDataModifiedDate = function(name) {
 	return false;
 }
 Configuration.prototype._localImageModifiedDate = function(name) {
-	var me=this;
+	var me = this;
 	if (me.hasImage(name)) {
 		var path = me.imagePath(name);
 		var file = fs.File.fromPath(path);
@@ -365,7 +406,7 @@ Configuration.prototype._localImageModifiedDate = function(name) {
 	return false;
 }
 Configuration.prototype._localStyleModifiedDate = function(name) {
-	var me=this;
+	var me = this;
 	if (me.hasStyle(name)) {
 		var path = me.stylePath(name);
 		var file = fs.File.fromPath(path);
@@ -378,12 +419,12 @@ Configuration.prototype.getLocalData = function(name, defaultValue) {
 
 	var me = this;
 
-	console.log('Get Local Data: '+name);
+	console.log('Get Local Data: ' + name);
 
 	return new Promise(function(resolve, reject) {
 
 		if (me.hasConfiguration(name)) {
-			console.log('Has Local Data: '+name);
+			console.log('Has Local Data: ' + name);
 			me.readPath(name).then(function(string) {
 				console.log('Successfully read data: ' + name + " " + me.configurationPath(name) + ":  " + string);
 				var config = JSON.parse(string);
@@ -396,17 +437,17 @@ Configuration.prototype.getLocalData = function(name, defaultValue) {
 		}
 		console.log('Does not have: ' + me.configurationPath(name));
 		console.log('Use default data: ' + name);
-		setTimeout(function(){
+		setTimeout(function() {
 			resolve(defaultValue);
-		},1)
-		
+		}, 1)
+
 	});
 
 }
 
 
 Configuration.prototype.setLocalData = function(name, data) {
-	var me=this;
+	var me = this;
 	console.log('Store Local Data: ' + name + ":  " + JSON.stringify(data) + " " + me.configurationPath(name));
 	return me.saveConfig(name, data);
 
@@ -439,6 +480,14 @@ Configuration.prototype._get = function(path, config) {
 
 }
 
+Configuration.prototype.setDefaultParameters = function(parameters) {
+
+	var me = this;
+	me._defaultConfig = {
+		"parameters": parameters
+	};
+
+}
 Configuration.prototype.getDefaultParameters = function() {
 
 	var me = this;
@@ -481,48 +530,15 @@ Configuration.prototype.get = function(name, defaultValue) {
 
 
 }
-Configuration.prototype.getIcon = function(name, urlPath) {
-
-	var me = this;
-
-
-	if (_isArray(name) && typeof name[0] == 'string') {
-		name = name[0];
-	}
-
-
-
-	if (me._shouldUseImageCacheItem(name, urlPath)) {
-		return me._getLocalImageSrc(name);
-	}
-
-
-
-	if (!urlPath) {
-
-		urlPath = me.get(name, name);
-
-	}
-
-
-	//console.log('Requesting cacheable image: '+name+' '+urlPath);
-
-	if (!urlPath) {
-		throw "Empty url";
-	}
-
-	var url = me._formatUrl(urlPath) + "?thumb=128x128";
-
-	return me._getImageSrc(name, url);
-
-};
 
 Configuration.prototype._getLocalImageSrc = function(name) {
 
-	var me=this;
+	var me = this;
 	var path = me.imagePath(name);
 	return new Promise(function(resolve, reject) {
-		setTimeout(function(){ resolve(path); }, 1);
+		setTimeout(function() {
+			resolve(path);
+		}, 1);
 	});
 
 }
@@ -533,12 +549,20 @@ Configuration.prototype._getImageSrc = function(name, url) {
 
 	return new Promise(function(resolve, reject) {
 
+
+		if (url.indexOf('~') === 0) {
+			 resolve(url);
+			 return
+		}
+
+
 		if (url.indexOf('http') !== 0) {
 			url = me.client.getProtocol() + "://" + me.client.getUrl() + '/' + url;
 		}
 
+		console.log("request image: "+url);
 		require('http').getImage(encodeURI(url)).then(function(imgSource) {
-
+			
 			resolve(me.saveImage(name, imgSource));
 
 		}).catch(function(error) {
@@ -559,37 +583,46 @@ Configuration.prototype._getImageSrc = function(name, url) {
 
 }
 
+
 Configuration.prototype.getImage = function(name, urlPath) {
 
 	var me = this;
 
+	return new Promise(function(resolve, reject) {
 
 
-	if (me._shouldUseImageCacheItem(name, urlPath)) {
-		return me._getLocalImageSrc(name);
-	}
+		if (_isArray(name) && typeof name[0] == 'string') {
+			name = name[0];
+		}
+
+
+		if (me._shouldUseImageCacheItem(name, urlPath)) {
+			resolve(me._getLocalImageSrc(name));
+			return;
+		}
 
 
 
-	if (!urlPath) {
+		if (!urlPath) {
 
-		urlPath = me.get(name);
+			urlPath = me.get(name);
 
-	}
-
-
-	//console.log('Requesting cacheable image: '+name+' '+urlPath);
-
-	if (!urlPath) {
-		throw "Empty url";
-	}
+		}
 
 
-	var url = me._formatUrl(urlPath);
+		//console.log('Requesting cacheable image: '+name+' '+urlPath);
+
+		if (!urlPath) {
+			throw "Empty url";
+		}
 
 
-	return me._getImageSrc(name, url);
+		var url = me._formatUrl(urlPath);
 
+
+		resolve(me._getImageSrc(name, url));
+
+	});
 
 };
 
@@ -612,8 +645,10 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 		var path = me.stylePath(name);
 		return new Promise(function(resolve, reject) {
 
-			setTimeout(function(){ resolve(path); }, 1);
-			
+			setTimeout(function() {
+				resolve(path);
+			}, 1);
+
 		});
 	}
 
@@ -649,7 +684,7 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 				return response.text();
 			})
 			.then(function(text) {
-				console.log("Downloaded Style: "+text.substring(0, 50)+' ...');
+				console.log("Downloaded Style: " + text.substring(0, 50) + ' ...');
 				me.saveStyle(name, text);
 				resolve(me.stylePath(name));
 			})
@@ -671,6 +706,83 @@ Configuration.prototype.getStyle = function(name, urlPath) {
 
 };
 
+Configuration.prototype.downloadDependencies = function(name, config) {
+
+	var me = this;
+
+	var eventData = {
+		eventName: "downloadingDependencies",
+		object: me,
+		name: name,
+		config: config
+
+	};
+	me.notify(eventData);
+
+	me._downloadDependencies(config);
+
+
+	var eventData = {
+		eventName: "downloadedDependencies",
+		object: me,
+		name: name,
+		config: config
+
+	};
+	me.notify(eventData);
+
+
+};
+Configuration.prototype._downloadDependencies = function(configItem) {
+
+	var me = this;
+
+	if (_isObject(configItem)) {
+		Object.keys(configItem).forEach(function(k) {
+			me._downloadDependencies(configItem[k]);
+		})
+		return;
+	}
+	if (_isArray(configItem)) {
+		configItem.forEach(function(v) {
+			me._downloadDependencies(v);
+		});
+		return;
+	}
+
+	if (typeof configItem == "string") {
+		//console.log("Found String: "+configItem);
+		if (configItem.indexOf(".png") > 0 || configItem.indexOf(".jpg") > 0) {
+
+			if (configItem.indexOf('~') === 0) {
+				return;
+			}
+
+			var eventData = {
+				eventName: "downloadedAsset",
+				object: me,
+				name: configItem,
+			};
+			me.notify(eventData);
+
+			var ImageResolver = require('../').ImageResolver;
+			console.log('downloaded: '+configItem);
+			return (new ImageResolver()).createImage(configItem);
+
+			// .then(function(src){
+			// 	//JS: https://wabun.geolive.ca/components/com_geolive/users_files/user_files_681/Uploads/CT4_[G]_a5A_aOy_[ImAgE].png
+
+			// 	console.log('downloaded: '+src);
+			// }).catch(function(err) {
+			// 	console.error(err);
+			// 	console.error('Unable to resolve image: ' + configItem);
+			// 	console.error(err.stack);
+			// });
+
+		}
+	}
+
+};
 
 
 module.exports = Configuration;
