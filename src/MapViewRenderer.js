@@ -223,8 +223,8 @@ MapViewRenderer.prototype.loadLayers=function(mapView, field){
 				 console.log('Done'); 
 				 	
 				 }).catch(function(e){
-				 	console.log('Failed to get image: '+iconPath+": "+e);
-				 	console.log('Error: '+e);
+				 	console.error('Failed to get image: '+iconPath+": "+e);
+				 	console.error('Error: '+e);
 				 });
 
 			});

@@ -155,6 +155,22 @@ DataAcquisitionApplication.prototype.requirePermissionFor = function(item) {
     }
 
 
+    if(item.indexOf(':optional')>0){
+        var resource=item.split(':').shift();
+        return new Promise(function(resolve, reject){
+            me.requirePermissionFor(resource).then(function(result) {
+               resolve(result);
+            }).catch(function(err){
+
+                console.log('Failed to get optional item permission: '+resource);
+                console.error(err+JSON.stringify(err));
+                
+                resolve(null);
+            });
+        });
+    }
+
+
 
     if (item == "camera") {
         return me.requireAccessToCamera();
@@ -240,6 +256,12 @@ DataAcquisitionApplication.prototype.requireAccessToCamera = function() {
         var camera = require("nativescript-camera");
         if (!camera.isAvailable()) {
             throw 'No camera available';
+            /**
+             * this is most likely a simulator..
+             * should pass a mock camera object here.
+             */
+            //resolve(null);
+            return;
         }
 
         console.log('Request Camera');
@@ -1197,7 +1219,7 @@ DataAcquisitionApplication.prototype._runApplication = function(page) {
         } catch (err) {
             console.error(err);
             console.error("Failed to render logo: " + imageSource);
-            console.error(err.trace);
+            //console.error(err.trace);
         }
         removeIndicator();
 

@@ -333,7 +333,7 @@ Configuration.prototype._imageItemIsExpired = function(name, urlPath) {
 	}
 	var expired=name != urlPath && me._refreshCacheImageItems && me._localImageModifiedDate(name) < me._refreshDate;
 
-	console.log('check expired image: '+(expired?"expired":"all good"));
+	console.log('check expired image: '+(expired?"expired":"all good")+" "+(hasImg?"exists":" does not exist")+" "+me.imagePath(name));
 
 
 	return expired;
@@ -537,6 +537,7 @@ Configuration.prototype._getLocalImageSrc = function(name) {
 	var path = me.imagePath(name);
 	return new Promise(function(resolve, reject) {
 		setTimeout(function() {
+			console.log("set local image "+path);
 			resolve(path);
 		}, 1);
 	});
@@ -550,6 +551,7 @@ Configuration.prototype._getImageSrc = function(name, url) {
 	return new Promise(function(resolve, reject) {
 
 
+
 		if (url.indexOf('~') === 0) {
 			 resolve(url);
 			 return
@@ -560,22 +562,29 @@ Configuration.prototype._getImageSrc = function(name, url) {
 			url = me.client.getProtocol() + "://" + me.client.getUrl() + '/' + url;
 		}
 
-		console.log("request image: "+url);
-		require('http').getImage(encodeURI(url)).then(function(imgSource) {
-			
+		console.log("Http Request Image: "+url+" ");
+		//console.log("Http Request Image: "+encodeURI(url)+" ");
+		require('http').getImage(url).then(function(imgSource) {
+			//encodeURI(url)
+
+
 			resolve(me.saveImage(name, imgSource));
 
 		}).catch(function(error) {
+
+			console.log("Error downloading image (trying to recover): "+url);
 
 			if (me.hasImage(name)) {
 				me._getLocalImageSrc(name).then(function(thing) {
 					resolve(thing);
 				}).catch(function(e) {
+					console.log('Reject: error me._getLocalImageSrc(name)');
 					reject(e);
 				})
 				return;
 			}
-
+			console.log(error+" "+JSON.stringify(error));
+			console.log('Reject: !me.hasImage('+name+')');
 			reject(error);
 		});
 
@@ -597,6 +606,7 @@ Configuration.prototype.getImage = function(name, urlPath) {
 
 
 		if (me._shouldUseImageCacheItem(name, urlPath)) {
+			console.log("use cache item: "+name);
 			resolve(me._getLocalImageSrc(name));
 			return;
 		}
@@ -627,6 +637,15 @@ Configuration.prototype.getImage = function(name, urlPath) {
 };
 
 Configuration.prototype._formatUrl = function(url) {
+
+	if(typeof url =="string"){
+		var parts=url.split('?');
+		for(var i=1;i<parts.length;i++){
+			parts[i]=encodeURI(parts[i]);
+		}
+		url=parts.join('?');
+	}
+
 
 	return url; //url.split('[').join('%5B').split(']').join('%5D');
 

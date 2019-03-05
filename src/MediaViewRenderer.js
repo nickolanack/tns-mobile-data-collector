@@ -17,16 +17,16 @@ function MediaViewRenderer() {
 var extend = function() {
 
 
-	var a=arguments[0];
-	var items=Array.prototype.slice.call(arguments, 1);
+	var a = arguments[0];
+	var items = Array.prototype.slice.call(arguments, 1);
 
-	items.forEach(function(b){
+	items.forEach(function(b) {
 		b = b || {};
 		Object.keys(b).forEach(function(k) {
 			a[k] = b[k];
 		});
 	})
-	
+
 
 	return a;
 }
@@ -37,15 +37,96 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 	var me = this;
 
 	var wrapLayoutModule = require("ui/layouts/wrap-layout");
-	var imageModule = require("ui/image");
-
-
 	var mediaSelection = new wrapLayoutModule.WrapLayout();
 
 	me._renderer._addClass(mediaSelection, "media-selection")
 	me._renderer._addClass(mediaSelection, field);
 	container.addChild(mediaSelection);
+	me._renderMediaPickerInto(mediaSelection, field);
+};
 
+
+
+MediaViewRenderer.prototype._renderImageAsset = function(mediaSelection, mediaOptions, imageAsset, imagePath, onRemove) {
+
+	var me = this;
+
+	console.log('renderImageAsset ' + imageAsset + ' : ' + imagePath);
+
+	//var imageAssetModule = require("tns-core-modules/image-asset/image-asset");
+
+	var assetName = false;
+	if (!imagePath) {
+
+		me._storeAsset(imageAsset).then(function(name) {
+			imagePath = name;
+			var imageAssets = me._renderer._model.get(mediaOptions.name) || [];
+			imageAssets.push(name);
+			me._renderer._model.set(mediaOptions.name, imageAssets);
+		}).catch(function(e) {
+			console.error(e);
+			console.error("Failed to store image asset");
+		})
+
+	}
+
+	//TODO: force ios refresh after append image!!
+
+	var imageViewBtn = {
+		"icon": imageAsset,
+		"stretch": "aspectFill",
+		"className": "image-icon",
+		"action": "form",
+		"name": "image-viewer",
+		"fields": [{
+			"type": "image",
+			"image": function() {
+				return imagePath;
+			}
+		}]
+	};
+
+	var imageRemoveBtn = {
+		"icon": mediaOptions.iconForRemoveImage,
+		"className": "remove-media",
+		"action": function() {
+
+			var imageAssets = me._renderer._model.get(mediaOptions.name) || [];
+			var i = imageAssets.indexOf(imagePath);
+			if (i >= 0) {
+
+				mediaSelection.removeChild(buttonset);
+				imageAssets.splice(i, 1);
+				me._renderer._model.set(mediaOptions.name, imageAssets);
+
+
+
+				onRemove(imageAsset, imagePath);
+				
+
+
+			}
+		}
+	};
+
+	if (mediaOptions.imageTapToRemove) {
+		imageViewBtn = {
+			"icon": imageAsset,
+			"stretch": "aspectFill",
+			"className": "image-icon",
+			"action": imageRemoveBtn.action
+		};
+	}
+
+	var buttonset = me._renderer.renderButtonset(mediaSelection, {
+		"className": 'image-selection',
+		"buttons": [imageViewBtn, imageRemoveBtn]
+	});
+}
+
+MediaViewRenderer.prototype._renderMediaPickerInto = function(mediaSelection, field) {
+
+	var me = this;
 	var mediaOptions = extend({
 
 		showImage: true,
@@ -55,13 +136,12 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 		labelForImage: "Add Image",
 		labelForVideo: "Add Video",
 		labelForAudio: "Add Audio",
-		labelForImageLibrary:"Library",
+		labelForImageLibrary: "Library",
 
-		iconForRemoveImage:"{remove-media}",
-		iconForRemoveVideo:"{remove-media}",
-		iconForRemoveAudio:"{remove-media}",
-		imageTapToRemove:false
-
+		iconForRemoveImage: "{remove-media}",
+		iconForRemoveVideo: "{remove-media}",
+		iconForRemoveAudio: "{remove-media}",
+		imageTapToRemove: false
 
 
 
@@ -70,127 +150,127 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 	var hideButton = function() {
 
 		/**
-		 * can only hide button is media is required (automatically enter picker without tap)
+		 * can only hide button if media is required (automatically enter picker without tap)
 		 * and limit is 1.
 		 */
 
 		return mediaOptions.hideButton && mediaOptions.required && mediaOptions.limit == 1;
 	}
 
-	var imageAssets = [];
+	var imageAssets = me._renderer._model.get(field.name) || [];
 
-	var assets=me._renderer._model.get(field.name);
-	console.log('Assets ('+field.name+'): '+JSON.stringify(assets, null, '   '));
-	if(assets&&assets.length){
-		imageAssets=assets;
-	}else{
-		me._renderer._model.set(field.name, imageAssets);
+	var assets = me._renderer._model.get(field.name);
+	console.log('Assets (' + field.name + '): ' + JSON.stringify(imageAssets, null, '   '));
+	me._renderer._model.set(field.name, imageAssets);
+	me._renderer._model.set(field.name + '-at-limit', false);
+
+
+	var addPhoto=false;
+	var addLibraryImage=false;
+	var onRemoveAsset=function(imageAsset, imagePath){
+
+		var imageAssets = me._renderer._model.get(field.name) || [];
+		if (mediaOptions.required && imageAssets.length == 0) {
+
+			if(addPhoto){
+
+				addPhoto(function(err, asset) {
+					if (err) {
+						imageAssets.splice(i, 0, imagePath);
+						renderImageAsset(imageAsset, imagePath); //restore;
+
+					}
+				});
+
+				return;
+			}
+
+
+			if(addLibraryImage){
+				addLibraryImage(function(err, asset) {
+					if (err) {
+						imageAssets.splice(i, 0, imagePath);
+						renderImageAsset(imageAsset, imagePath); //restore;
+
+					}
+				});
+			}
+		}
+
+
+
 	}
 
-	me._renderer._model.set(field.name+'-at-limit', false);
-	
+
+	addLibraryImage=function(fn){
+
+			var imagepicker = require("nativescript-imagepicker");
+			var context = imagepicker.create({
+				mode: "single" // use "multiple" for multiple selection
+			});
+
+			context.authorize()
+				.then(function() {
+					return context.present();
+				})
+				.then(function(selection) {
+					selection.forEach(function(imageAsset) {
+						//console.log('Image Picker '+JSON.stringify(selected));
+						renderImageAsset(imageAsset);
+						fn(null, imageAsset);
+					});
+					list.items = selection;
+				}).catch(function(e) {
+					console.log('Image Picker Error: ' + JSON.stringify(e));
+					fn(e, null);
+				});
+
+		}
+
+	var renderImageAsset = function(imageAsset, imagePath) {
+		me._renderImageAsset(mediaSelection, mediaOptions, imageAsset, imagePath, onRemoveAsset);
+	}
 
 	if (mediaOptions.showImage || mediaOptions.showVideo) {
 
 
+		
 
-		require('../').DataAcquisitionApplication.SharedInstance().requireAccessToCamera().then(function(camera) {
+		if (imageAssets.length > 0) {
+			imageAssets.map(function(path) {
+				renderImageAsset(path, path);
+			});
+		}
 
 
+		require('../').DataAcquisitionApplication.SharedInstance().requirePermissionFor('camera:optional').then(function(camera) {
 
-			var renderImageAsset=function(imageAsset, imagePath){
+			if (!camera) {
 
-
-				console.log('renderImageAsset '+imageAsset+':'+imagePath);
-
-				//var imageAssetModule = require("tns-core-modules/image-asset/image-asset");
-
-				var assetName = false;
-				if(!imagePath){
-
-					me._storeAsset(imageAsset).then(function(name) {
-						imagePath = name;
-						imageAssets.push(name);
-						me._renderer._model.set(field.name, imageAssets);
-					}).catch(function(e){
-						console.error(e);
-						console.error("Failed to store image asset");
-					})
-
+				if (mediaOptions.showImageLibrary == false) {
+					me._renderMediaPickerInto(mediaSelection, extend(extend({}, mediaOptions), {
+						showImage: false,
+						showVideo: false,
+						showImageLibrary: true
+					}));
 				}
-
-				//TODO: force ios refresh after append image!!
-				
-				var imageViewBtn={
-					"icon": imageAsset,
-					"stretch": "aspectFill",
-					"className": "image-icon",
-					"action": "form",
-					"name": "image-viewer",
-					"fields": [{
-						"type": "image",
-						"image": function() {
-							return imagePath;
-						}
-					}]
-				};
-
-				var imageRemoveBtn={
-					"icon": mediaOptions.iconForRemoveImage,
-					"className": "remove-media",
-					"action": function() {
-						
-						var i = imageAssets.indexOf(imagePath);
-						if (i >= 0) {
-							
-							mediaSelection.removeChild(buttonset);
-							imageAssets.splice(i, 1);
-							me._renderer._model.set(field.name, imageAssets);
-
-							if (field.required && imageAssets.length == 0) {
-								addPhoto(function(err, asset){
-									if(err){
-										imageAssets.splice(i, 0, imagePath);
-										renderImageAsset(imageAsset, imagePath); //restore;
-
-									}
-								});
-
-								return;
-							}
-
-
-						}
-					}
-				};
-
-				if(mediaOptions.imageTapToRemove){
-					imageViewBtn={
-						"icon": imageAsset,
-						"stretch": "aspectFill",
-						"className": "image-icon",
-						"action": imageRemoveBtn.action
-					};
-				}
-
-				var buttonset = me._renderer.renderButtonset(mediaSelection, {
-					"className": 'image-selection',
-					"buttons": [imageViewBtn, imageRemoveBtn]
-				});
+				return;
 			}
 
 
 
-			var addPhoto = function(fn) {
 
 
-				if(field.limit&&imageAssets.length>=field.limit){
-					console.log('Media Limit Reached (photo): '+imageAssets.length);
+			addPhoto = function(fn) {
+
+
+				if (field.limit && imageAssets.length >= field.limit) {
+					console.log('Media Limit Reached (photo): ' + imageAssets.length);
 					return;
 				}
 
 				camera.takePicture({
-						cameraFacing:(!!field.selfie)?"front":"back",
+						cameraFacing: (!!field.selfie) ? "front" : "back",
 						width: 500,
 						height: 500,
 						keepAspectRatio: true,
@@ -199,13 +279,13 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 					.then(function(imageAsset) {
 
 						renderImageAsset(imageAsset);
-						if(fn){
+						if (fn) {
 							fn(null, imageAsset);
 						}
 
 					}).catch(function(err) {
 						console.log("Camera Error -> " + err);
-						if(fn){
+						if (fn) {
 							fn(err, null);
 						}
 					});
@@ -215,8 +295,8 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			var addVideo = function() {
 
 
-				if(field.limit&&imageAssets.length>=field.limit){
-					console.log('Media Limit Reached (video): '+imageAssets.length);
+				if (field.limit && imageAssets.length >= field.limit) {
+					console.log('Media Limit Reached (video): ' + imageAssets.length);
 					return;
 				}
 
@@ -287,11 +367,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			};
 
 
-			if(imageAssets.length>0){
-					imageAssets.map(function(path){
-						renderImageAsset(path, path);
-					});
-				}
+			
 
 			if (field.required) {
 
@@ -312,15 +388,15 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			}
 
 			var buttons = []
-			
+
 			if (mediaOptions.showImage && (!hideButton())) {
 				me._renderer.renderField(mediaSelection, extend({
 
-					type:"button",
+					type: "button",
 					label: mediaOptions.labelForImage,
 					className: "add-photo"
-					
-				}, field.imageButton||field.button, {
+
+				}, field.imageButton || field.button, {
 
 					action: function() {
 						addPhoto();
@@ -328,48 +404,7 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 				}));
 
-				if(mediaOptions.showImageLibrary){
-
-					me._renderer.renderField(mediaSelection, extend({
-
-						type:"button",
-						label: mediaOptions.labelForImageLibrary,
-						className: "add-photo library"
-						
-					}, field.libraryButton, {
-
-						action: function() {
-							
-							var imagepicker = require("nativescript-imagepicker");
-							var context = imagepicker.create({
-							    mode: "single" // use "multiple" for multiple selection
-							});
-
-							context
-						    .authorize()
-						    .then(function() {
-						        return context.present();
-						    })
-						    .then(function(selection) {
-						        selection.forEach(function(imageAsset) {
-						            //console.log('Image Picker '+JSON.stringify(selected));
-						            renderImageAsset(imageAsset);
-						        });
-						        list.items = selection;
-						    }).catch(function (e) {
-						        console.log('Image Picker Error: '+JSON.stringify(e));
-						    });
-
-
-						}
-
-					}));
-
-
-				}
-
 				
-
 
 
 
@@ -377,11 +412,11 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 
 			if (mediaOptions.showVideo && (!hideButton())) {
 				me._renderer.renderField(mediaSelection, extend({
-					type:"button",
+					type: "button",
 					label: mediaOptions.labelForVideo,
 					className: "add-video"
-					
-				}, field.videoButton||field.button, {
+
+				}, field.videoButton || field.button, {
 					action: function() {
 						addVideo();
 					}
@@ -393,20 +428,38 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 	}
 
 
+	if (mediaOptions.showImageLibrary) {
+
+
+
+
+		me._renderer.renderField(mediaSelection, extend({
+
+			type: "button",
+			label: mediaOptions.labelForImageLibrary,
+			className: "add-photo library"
+
+		}, field.libraryButton, {
+
+			action: function() {
+				addLibraryImage();
+			}
+
+		}));
+
+
+	}
+
+
 
 	var showAddAudioView = function() {
 
-		if(field.limit&&imageAssets.length>=field.limit){
-			console.log('Media Limit Reached (audio): '+imageAssets.length);
+		if (field.limit && imageAssets.length >= field.limit) {
+			console.log('Media Limit Reached (audio): ' + imageAssets.length);
 			return;
 		}
 
-		
 
-
-
-
-		
 
 		me._renderer._showSubform({
 			"className": "submit",
@@ -556,15 +609,15 @@ MediaViewRenderer.prototype.renderMediaPicker = function(container, field) {
 			}
 		}
 
-		if (!hideButton()){
+		if (!hideButton()) {
 
 			var buttons = [];
 			me._renderer.renderField(mediaSelection, extend({
-				type:"button",
+				type: "button",
 				label: mediaOptions.labelForAudio,
-				className: "add-video"
-				
-			}, field.audioButton||field.button, {
+				className: "add-audio"
+
+			}, field.audioButton || field.button, {
 				action: function() {
 					showAddAudioView();
 				}
@@ -608,8 +661,6 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 	}
 
 
-	
-
 
 	//var permissions = require('nativescript-permissions');
 
@@ -636,38 +687,35 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 			"action": function() {
 
 				require('../').DataAcquisitionApplication.SharedInstance().requireAccessToMicrophone().then(function(recorder) {
-	
-				
 
 
 
 					if (!me._renderer._model.get('recording')) {
 
-						
-							console.log('Ready to record');
-							recorder.start(recorderOptions).then(function(something) {
+
+						console.log('Ready to record');
+						recorder.start(recorderOptions).then(function(something) {
 
 
-								console.log('Recording');
-								console.log(something);
-								secondsx10 = 0;
+							console.log('Recording');
+							console.log(something);
+							secondsx10 = 0;
 
-								me._renderer._model.set('recording', true);
-								me._renderer._model.set('labelState', 'Press To Stop Recording');
-								me._renderer._model.set('seconds', 0.0);
-								me._renderer._model.set('hasAudio', false);
-
-
-								interval = setInterval(function() {
-									secondsx10 += 1;
-									me._renderer._model.set('seconds', Math.round(secondsx10) / 10.0);
-								}, 100);
+							me._renderer._model.set('recording', true);
+							me._renderer._model.set('labelState', 'Press To Stop Recording');
+							me._renderer._model.set('seconds', 0.0);
+							me._renderer._model.set('hasAudio', false);
 
 
-							}).catch(function(e) {
-								console.log("Audio Error " + e);
-							});
-						
+							interval = setInterval(function() {
+								secondsx10 += 1;
+								me._renderer._model.set('seconds', Math.round(secondsx10) / 10.0);
+							}, 100);
+
+
+						}).catch(function(e) {
+							console.log("Audio Error " + e);
+						});
 
 
 
@@ -683,7 +731,7 @@ MediaViewRenderer.prototype.renderAudioRecorder = function(container, field) {
 						}
 					}
 
-				}).catch(function(err){
+				}).catch(function(err) {
 					console.error(err);
 					console.error('failed to get micropone');
 				});

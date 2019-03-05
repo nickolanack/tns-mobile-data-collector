@@ -893,7 +893,18 @@ ViewRenderer.prototype.renderTextField = function(container, field) {
 	if(field.placeholder){
 		textfield.hint = field.placeholder;
 	}
+
+	if(field.capitalize){
+		//"none" | "words" | "sentences" | "allcharacters",
+		textfield.autocapitalizationType=field.capitalize;
+
+	}
 	
+	if(typeof field.autocorrect!="undefined"){
+		//"none" | "words" | "sentences" | "allcharacters",
+		textfield.autocorrect=!!field.autocorrect;
+
+	}
 
 	me._addClass(textfield, "textfield")
 	var bindingOptions = {
@@ -1392,7 +1403,7 @@ ViewRenderer.prototype.executeTapAction = function(button, field) {
 
 	if (action == 'form' || action == 'view' || action == 'list') {
 
-		//me._navigateToForm(field);
+		
 		me._showSubform(field);
 
 		return
@@ -1422,6 +1433,8 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 
 	var me = this;
 
+	console.log("_showSubform: ");
+
 	if(!(field.form||field.name||field.view)){
 		
 
@@ -1438,17 +1451,21 @@ ViewRenderer.prototype._showSubform = function(field, callback) {
 	}
 
 
+	
 	if(field.permissions&&field.permissions.length){
 
 		me._app().requirePermissionFor(field.permissions).then(function(){
 			me._showSubform(extend({}, field, {permissions:false}));
 		}).catch(function(err){
 
+			console.log("deniedPermissionTo: "+JSON.stringify(field.permissions));
+			console.error(err+JSON.stringify(err));
 
 			var eventData = {
 				eventName: 'deniedPermissionTo',
 				object: me,
-				error:err
+				error:err,
+				permissions:field.permissions
 			};
 			me.notify(eventData);
 
@@ -2400,7 +2417,7 @@ ViewRenderer.prototype.renderView = function(page, fields) {
 	try{
 		me._renderFields(container, elements);
 	}catch(e){
-		console.error(e);
+		console.error(e+JSON.stringify(e));
 		throw 'Error rendering view fields: '+formName+" "+JSON.stringify(elements);
 	}
 

@@ -1,6 +1,6 @@
 var dialogs;
 var Pusher;
-var IPublicChannelEventListener;
+//var IPublicChannelEventListener;
 
 var loaded=false;
 
@@ -20,8 +20,8 @@ function Messages(params) {
 
 
 	try{
-		Pusher = require("pusher-nativescript").Pusher;
-		IPublicChannelEventListener = require("pusher-nativescript/interfaces");
+		Pusher = require("nativescript-pusher").Pusher;
+		//IPublicChannelEventListener = require("pusher-nativescript/interfaces");
 
 		setTimeout(function(){
 	        me.connect();
@@ -54,7 +54,16 @@ Messages.prototype.connect=function(){
 	
 
 
-	pusher.connect().then(function() {
+	pusher.connect(function(err) {
+
+		if(err){
+			console.log("Pusher Error Connect:"+JSON.stringify({
+			  	"pusherAppChannelPrefix":params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.',
+			  	"pusherAppKey":params.pusherAppKey
+			  })+": "+err+JSON.stringify(err));
+
+		}
+
 	  console.log('Pusher Connected Successfully');
 	  me.pusher=pusher;
 
@@ -65,12 +74,6 @@ Messages.prototype.connect=function(){
 	  	});
 	  	delete me._queue;
 	  }
-
-	}).catch(function(error) {
-	  console.log("Pusher Error Connect:"+JSON.stringify({
-	  	"pusherAppChannelPrefix":params.hasOwnProperty("pusherAppChannelPrefix")?params.pusherAppChannelPrefix:'dev.',
-	  	"pusherAppKey":params.pusherAppKey
-	  })+": "+JSON.stringify(error));
 
 	});
 
@@ -96,7 +99,7 @@ Messages.prototype._subscribe = function(channel, event, callback) {
 
 	var me=this;
 	if(!callback){
-		callback=function(data){
+		callback=function(err, data){
 
 			if(data.text){
 				me.alert({
@@ -128,15 +131,23 @@ Messages.prototype._subscribe = function(channel, event, callback) {
 		};
 
 	 
-	var channelTypeAndName ='public-'+me.prefix+channel;
+	var channelTypeAndName =''+me.prefix+channel;
 	var eventName = event;
 	 
 	console.log('Channel subscription and event binding attempting: '+channel+' '+event);
-	me.pusher.subscribe(channelTypeAndName, eventName, publicChannelEventsListeners).then(function() {
-	  console.log('Channel subscription and event binding succeeded');
-	}).catch(function(error){
-		console.log("Pusher Error Subscribe: "+JSON.stringify(error));
-	})
+	//me.pusher.subscribeToChannelEvent(channelTypeAndName, eventName, publicChannelEventsListeners)
+
+
+	me.pusher.subscribeToChannelEvent(channelTypeAndName, eventName, function(err, message){
+
+		callback(message.data);
+	});
+
+	// .then(function() {
+	//   console.log('Channel subscription and event binding succeeded');
+	// }).catch(function(error){
+	// 	console.log("Pusher Error Subscribe: "+JSON.stringify(error));
+	// })
 	 
 
 }

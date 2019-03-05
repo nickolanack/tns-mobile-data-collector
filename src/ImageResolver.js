@@ -34,6 +34,27 @@ ImageResolver.prototype._isImageAsset = function(asset) {
 	}
 }
 
+ImageResolver.prototype._imageFromLocalFileAsset=function(url){
+	var filepath = url;
+	var fs = require("file-system");
+
+	if (filepath.indexOf('/') < 0) {
+		var savepath = fs.knownFolders.documents().path;
+		filepath = fs.path.join(savepath, url);
+	}
+
+
+
+	if(fs.File.exists(filepath)){
+		var imageModule = require("ui/image");
+		var image = new imageModule.Image();
+		console.log('Set Image From Asset ' + url);
+		image.src = filepath;
+		return image;
+	}
+	throw 'file does not exist locally';
+}
+
 ImageResolver.prototype._imageFromImageAsset = function(asset) {
 	var imageModule = require("ui/image");
 	var image = new imageModule.Image();
@@ -71,14 +92,20 @@ ImageResolver.prototype._setCachedImageAsync = function(url, image) {
 		var config=me._config();
 		var hasImage=config.hasCachedImage(url);
 
+
+		//var traceError = new Error('de-anonymize');
+
 		setTimeout(function(){
 			config.getImage(url, url).then(function(path){
 
+				console.log('_setCachedImageAsync image: '+path);
 				image.src=path;
 				//console.log('Image Async: '+((new Date()).valueOf()-startTime)+"ms "+path);
 
 			}).catch(function(err){
-				console.log('Error caching url: '+JSON.stringify(err)+' '+url);
+				//console.error(err.trace);
+				//console.error(traceError.stack);
+				console.error('Error caching url: '+JSON.stringify(err)+' '+url);
 			});
 		}, 250);
 		
