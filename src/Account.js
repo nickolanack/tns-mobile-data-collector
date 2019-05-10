@@ -161,7 +161,7 @@ Account.prototype.getCurrentDeviceName = function() {
 Account.prototype._loadApplication = function() {
 
 	var me=this;
-	return me._getConfiguration().getConfiguration(me._getConfigurationName());
+	return me._getConfiguration().loadApplicationConfig();
 
 }
 
@@ -179,10 +179,6 @@ Account.prototype._getClient = function() {
 
 Account.prototype._getConfiguration = function() {
 	return require('../').Configuration.SharedInstance();
-}
-
-Account.prototype._getConfigurationName = function() {
-	return global.parameters.configuration;
 }
 
 
@@ -329,13 +325,13 @@ Account.prototype.login = function() {
 				console.log('client login error: ' + JSON.stringify(err));
 				//Attempt to run offline:
 				//try{      
-				if (me._getConfiguration().hasConfiguration(me._getConfigurationName()) && me._getConfiguration().hasConfigurationResources(me._getConfigurationName())) {
+				if (me._getConfiguration().hasApplicationConfig() && me._getConfiguration().hasApplicationConfigResources()) {
 
 
 
 					console.log('Can run offline');
 
-					me._getConfiguration().getConfiguration(me._getConfigurationName()).then(function(config) {
+					me._loadApplication().then(function(config) {
 
 
 						var eventData = {

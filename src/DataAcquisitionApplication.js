@@ -1151,7 +1151,9 @@ DataAcquisitionApplication.prototype.renderApplication = function(page) {
 
     console.log('Skipped Login process');
 
-    me._runApplication(page).catch(function(e) {
+    me._config().loadApplicationConfig().then(function(){
+        return me._runApplication(page);
+    }).catch(function(e) {
         console.log('Application Startup Error No Registration: ' + JSON.stringify(e));
         console.error(e);
         console.error(e.stack);
@@ -1212,7 +1214,7 @@ DataAcquisitionApplication.prototype._runApplication = function(page) {
 
 
 
-    return configuration.getImage('appLogo').then(function(imageSource) {
+    return configuration.getImage('appLogo', '~/logo.png').then(function(imageSource) {
 
         try {
             page.getViewById("logo").src = imageSource;
@@ -1237,9 +1239,9 @@ DataAcquisitionApplication.prototype._runApplication = function(page) {
             var frameModule = require("ui/frame");
             var topmost = frameModule.topmost();
 
-            if (topmost.android) {
-                //topmost.android.cachePagesOnNavigate = true;
-            }
+            // if (topmost.android) {
+            //     //topmost.android.cachePagesOnNavigate = true;
+            // }
 
 
 

@@ -1563,7 +1563,9 @@ ViewRenderer.prototype._navigateToForm=function(contextOptions){
 
 	var topmost = frameModule.topmost();
 
-	
+	if(!topmost.navigate){
+		throw 'why would topmost not have navigate method!???';
+	}
 
 	topmost.navigate({
 		moduleName: "views/form/form",
@@ -2444,15 +2446,22 @@ ViewRenderer.prototype._getBestFieldSetDefinition = function(name, view) {
 	}
 
 	name = names.shift();
-	console.log('look for view elements in ' + name);
-	var views = global.parameters[name] || false;
+	console.log('look for view elements in ' + name );
+	//var views = global.parameters[name] || false;
+
+	var views=(me._params()[name]) || false;
 
 	if (typeof views == 'string' && views[0] == "{") {
 		views = me._parse(views);
 	}
 
 	if (views && views[view]) {
-		return views[view];
+		var result=views[view];
+		if (typeof result == 'string' && result[0] == "{") {
+			return me._parse(result);
+		}
+
+		return result;
 	}
 
 	if (names.length) {
@@ -2536,6 +2545,11 @@ ViewRenderer.prototype.getActiveViewData = function(model) {
 	if (!model) {
 		model = me._model;
 	}
+
+	if(!model){
+		return {};
+	}
+
 	Object.keys(model).forEach(function(k) {
 		if (k.indexOf('_') === 0) {
 			return;

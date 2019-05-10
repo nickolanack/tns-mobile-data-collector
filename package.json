@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/nickolanack/tns-mobile-data-collector#readme",
   "dependencies": {
-    "moment": "^2.18.1"
+    "moment": "^2.18.1",
+    "push-node-socket-io-client": "git://github.com/nickolanack/push-node-socket-io-client.git#master"
   }
 }

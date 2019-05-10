@@ -125,6 +125,7 @@ Configuration.prototype.saveStyle = function(name, styleString) {
 	var path = me.stylePath(name);
 	var file = fs.File.fromPath(path);
 
+	console.log("saving css file to: "+path);
 	return file.writeText(styleString);
 
 }
@@ -201,6 +202,22 @@ Configuration.prototype.prepareDefaultConfig = function(obj) {
 
 	return config;
 };
+
+
+Configuration.prototype.loadApplicationConfig = function() {
+	var me=this;
+	return me.getConfiguration(global.parameters.configuration);
+}
+Configuration.prototype.hasApplicationConfig = function() {
+	var me=this;
+	return me.hasConfiguration(global.parameters.configuration);
+}
+Configuration.prototype.hasApplicationConfigResources = function() {
+	var me=this;
+	return me.hasConfigurationResources(global.parameters.configuration);
+}
+
+
 
 Configuration.prototype.getConfiguration = function(name) {
 
@@ -357,7 +374,7 @@ Configuration.prototype.extendDefaultParameters = function(data) {
 	var me = this;
 
 	if (!me._defaultConfig) {
-		throw 'Configuration not set';
+		throw 'Configuration not set while extending with: '+JSON.stringify(data);
 	}
 
 
@@ -493,7 +510,7 @@ Configuration.prototype.getDefaultParameters = function() {
 	var me = this;
 
 	if (!me._defaultConfig) {
-		throw 'Configuration not set';
+		throw 'Configuration not set: getDefaultParameters';
 	}
 
 	return me._defaultConfig.parameters;
@@ -504,7 +521,11 @@ Configuration.prototype.get = function(name, defaultValue) {
 	var me = this;
 
 	if (!me._defaultConfig) {
-		throw 'Configuration not set';
+		if(defaultValue){
+			console.error('Configuration not set: get('+name+', '+JSON.stringify(defaultValue)+')');
+			return defaultValue;
+		}
+		throw 'Configuration not set: get('+name+', '+JSON.stringify(defaultValue)+')';
 	}
 
 

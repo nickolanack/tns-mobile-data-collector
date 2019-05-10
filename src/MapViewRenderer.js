@@ -9,6 +9,13 @@ var application;
 var mapsModule;
 
 
+var _isArray = function(thing) {
+	return Object.prototype.toString.call(thing) === "[object Array]";
+}
+var _isObject = function(thing) {
+	return Object.prototype.toString.call(thing) === "[object Object]";
+}
+
 function MapViewRenderer() {
 
 
@@ -175,7 +182,7 @@ function requestPermissions() {
 
 MapViewRenderer.prototype._resolveLayer = function(layer) {
 	var me=this;
-	if(typeof layer=='string'||typeof layer=='number'){
+	if(typeof layer=='string'||typeof layer=='number'||_isObject(layer)){
 		var args=[layer];
 		var promise = me._renderer._getListViewRenderer()._listResolvers['layer'].apply(null, args);
 		return promise;
@@ -193,9 +200,18 @@ MapViewRenderer.prototype.loadLayers=function(mapView, field){
 		return [getConfiguration().get('layer')];
 	});
 
+	if(typeof layers=="string"&&layers.indexOf('{')===0){
+		layers=me._renderer._parse(layers);
+	}
+
 	console.log('Render Layers: '+JSON.stringify(layers));
 
 	layers.forEach(function(l){
+
+		if(typeof l=="string"&&l.indexOf('{')===0){
+			l=me._renderer._parse(l);
+		}
+
 		me._resolveLayer(l).then(function(list){
 			list.forEach(function(item){
 

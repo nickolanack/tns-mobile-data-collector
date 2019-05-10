@@ -53,24 +53,30 @@ ARViewRenderer.prototype.renderARView = function(container, field) {
     ar.showStatistics="true";
     ar.planeOpacity="0.2";
 
-	ar.on('arLoaded', function(){
-		console.log("Loaded");
+	ar.on('arLoaded', function(args){
+		console.log(arguments);
 
 
 
 
-		var shape=com.google.ar.sceneform.rendering.ShapeFactory.makeSphere(
-			10,{
-			    x: 0,
-			    y: 0,
-			    z: 10
-			  }, com.google.ar.sceneform.rendering.MaterialFactory.makeOpaqueWithColor(AR._context, new Color("blue")));
+	});
 
-		console.log('Added Sphere');
-	})
-	ar.on('planeTapped', function(){
-		console.log("Tapped");
-	})
+
+	ar.on('sceneTapped', function(){
+		console.log('sceneTapped');
+	});
+
+	ar.on('planeDetected', function(){
+		console.log('planeDetected');
+	});
+
+
+
+	ar.on('planeTapped', function(args){
+		console.log('planeTapped');
+		args.object.addModel();
+	});
+
 	container.addChild(ar);
 
 
